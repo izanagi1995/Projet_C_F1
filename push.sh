@@ -6,7 +6,8 @@ if [[ $? = 0 ]]; then
     echo "Please enter your commit message : "
     read msg
     git add --all
-    git commit -am "$msg"
+    MY_DATE=`date +%H:%M:%S`
+    git commit -am "$msg (cert : $MY_DATE)"
     git push
 else
     echo "Sorry, your build has failed... Push aborted";
