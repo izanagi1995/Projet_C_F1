@@ -1,5 +1,11 @@
 #define MEM_KEY 20135
 #define N_CARS 22
+
+typedef struct{
+    long mtype;
+    char evtCode;
+}event;
+
 typedef struct{
     float s1;
     float s2;
