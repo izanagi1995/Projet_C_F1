@@ -6,6 +6,9 @@
 #include <sys/shm.h>
 #include "defs.h"
 
+
+
+
 int main(int argc, char *argv[]){
    printf("Bienvenue au grand Tournoi de F1!\r\n");
    printf("Nous preparons le tournoi! \r\n");
@@ -14,6 +17,8 @@ int main(int argc, char *argv[]){
    int pipes[22][2]; //Ce sont les receivers pour les voitures. Seul main y écrit
    int mainPipe[2];  //C'est le receiver pour le main. Les voitures y envoient les events
    int carNums[22] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
+   
+   int mustDie = 0;
 
    if((mem_ID = shmget(MEM_KEY, N_CARS*sizeof(f1Car), IPC_CREAT | 0660 )) < 0){
        perror("Une erreur est survenue durant l'alignement des voitures: ");
@@ -92,9 +97,20 @@ int main(int argc, char *argv[]){
         //close(pipes[memSlot][1]);
         close(mainPipe[1]);
         int readFrom = mainPipe[0];
-        f1CarEvent recv;
-        read(readFrom, &recv, sizeof(f1CarEvent));
-        printf("%d, %d\r\n", recv.carCode, recv.eventCode);
+        int writeTo[22];
+        for(int d = 0; d < N_CARS; d++){
+            close(pipes[d][0]);
+            writeTo[d] = pipes[d][1];
+        }
+        while(!mustDie){
+            //Read pipe loop
+            //GUI
+            //Response
+            //A un moment ou un autre...
+            mustDie = 1;
+        }                
+
+
         //Je suis ton pere!
 //           _________
 //           III| |III
