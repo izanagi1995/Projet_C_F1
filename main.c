@@ -63,21 +63,39 @@ int main(int argc, char *argv[]){
    }
 
    if(pid == 0){
-       int memSlot = 0;
-       f1Car* mem = (f1Car *)memoire;
-       while(memSlot < N_CARS && mem[memSlot].writingLock == 1){
-           memSlot++;
-       }
-       mem[memSlot].writingLock = 1;
-       printf("%d\n", memSlot);
-       if(memSlot == 21){
-           //Je sais que je suis le dernier, je vais donc prévenir tout le monde
-           while(memSlot > 0){
-               mem[memSlot--].writingLock = 0;
-           }  
-       }
-   }else{
-       //Je suis ton pere!
+        int memSlot = 0;
+        int writingPipe = 0;
+       
+        f1Car* mem = (f1Car *)memoire;
+        while(memSlot < N_CARS && mem[memSlot].writingLock == 1){
+            memSlot++;
+        }
+        mem[memSlot].writingLock = 1;
+        printf("%d\n", memSlot);
+        
+        close(pipes[memSlot][1]);
+        close(mainPipe[0]);
+        int writeTo = mainPipe[1];
+        int readFrom = pipes[memSlot][0];      
+       
+        if(memSlot == 21){
+            //Je sais que je suis le dernier, je vais donc prévenir tout le monde
+            while(memSlot > 0){
+                mem[memSlot--].writingLock = 0;
+            }  
+            f1CarEvent readyEvent;
+            readyEvent.carCode = 21;
+            readyEvent.eventCode = 0;
+            write(writeTo, &readyEvent, sizeof(f1CarEvent));
+        }
+    }else{
+        //close(pipes[memSlot][1]);
+        close(mainPipe[1]);
+        int readFrom = mainPipe[0];
+        f1CarEvent recv;
+        read(readFrom, &recv, sizeof(f1CarEvent));
+        printf("%d, %d\r\n", recv.carCode, recv.eventCode);
+        //Je suis ton pere!
 //           _________
 //           III| |III
 //         IIIII| |IIIII
