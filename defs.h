@@ -1,5 +1,5 @@
-#define MEM_KEY 201354
-
+#define MEM_KEY 20135
+#define N_CARS 22
 typedef struct{
     float s1;
     float s2;
