@@ -11,15 +11,28 @@ int main(int argc, char *argv[]){
    printf("Nous preparons le tournoi! \r\n");
    int mem_ID;
    void* memoire;
-   
+   int pipes[22][2]; //Ce sont les receivers pour les voitures. Seul main y écrit
+   int mainPipe[2];  //C'est le receiver pour le main. Les voitures y envoient les events
    int carNums[22] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
 
    if((mem_ID = shmget(MEM_KEY, N_CARS*sizeof(f1Car), IPC_CREAT | 0660 )) < 0){
        perror("Une erreur est survenue durant l'alignement des voitures: ");
        exit(1);
    }
+
+   for(int j = 0; j < N_CARS; j++){
+      if((pipe(pipes[j])) != 0){
+          perror("Une erreur est survenue lors de l'envoi des invitations: ");
+          exit(1);
+      }
+   }
+   if((pipe(mainPipe)) != 0){
+       perror("Un hamster a retourné notre serveur mail, nous ne pouvons plus communiquer: ");
+       exit(1);
+   }
+
    if ((memoire = shmat(mem_ID, NULL, 0)) == (void*) -1){
-       perror("Une erreur est survenue lors de l'envoi des invitations aux concurrents: ");
+       perror("Une erreur est survenue lors de l'assignation des places: ");
        exit(1);
    }
 
