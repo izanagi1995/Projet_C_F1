@@ -14,7 +14,7 @@
 */
 int try_sys_call(int call_return, char msg_on_fail[]) {
 	if (call_return >= 0) return call_return;
-	perror(msg_on_fail[]);
+	perror(msg_on_fail);
 	exit(EXIT_FAILURE);
 }
 
