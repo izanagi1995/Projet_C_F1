@@ -23,22 +23,12 @@ struct sector_times {
 	float s3;
 };
 
-/* store the time for each pilote at the end of a race */
-typedef struct stored_time stored_time;
-struct stored_time {
-	unsigned int pilote_id;
-	sector_times *first_lap;
-};
-
 /* all info for a pilote */
 typedef struct f1_pilote f1_pilote;
 struct f1_pilote {
 	unsigned int pilote_id;
-	struct times {
-		float s1;
-		float s2;
-		float s3;
-	} times; // point a sector_times
+	float current_time;
 	char current_sector; // sector [1], sector [2], sector [3]
 	char status; // [D]riving, [P]itstop, [O]ut
+	stored_time *times[7];
 };
