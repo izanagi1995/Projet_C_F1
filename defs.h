@@ -1,3 +1,7 @@
+#ifndef DEFS_H_INCLUDED
+#define DEFS_H_INCLUDED
+
+
 #define MEM_KEY 20135
 #define N_CARS 22
 
@@ -7,14 +11,6 @@
 #define ESSAI         2
 #define QUALIFICATION 3
 #define COURSE        4
-
-#define TIMINGS(TYPE, ID) { TYPE##ID }
-#define P1            90
-#define P2            90
-#define P3            60
-#define Q1            18
-#define Q2            15
-#define Q3            12 
 
 /*
  * Specs code
@@ -40,6 +36,7 @@ typedef struct{
     float s1;
     float s2;
     float s3;        
+    float pit;
 }f1Times;
 
 typedef struct{
@@ -52,3 +49,5 @@ typedef struct{
              f1Times timesLap; 
 }f1Car;
 
+
+#endif

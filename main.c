@@ -4,12 +4,18 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/time.h>
+#include <sys/select.h>
 #include "defs.h"
+#include "manager.h"
+#include "car.h"
+
+//DEBUG
+#define PRINT_OPAQUE_STRUCT(p)  print_mem((p), sizeof(*(p)))
+//END DEBUG
 
 
-
-
-int main(int argc, char *argv[]){
+int main(){
    printf("Bienvenue au grand Tournoi de F1!\r\n");
    printf("Nous preparons le tournoi! \r\n");
    int mem_ID;
@@ -18,7 +24,6 @@ int main(int argc, char *argv[]){
    int mainPipe[2];  //C'est le receiver pour le main. Les voitures y envoient les events
    int carNums[22] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
    
-   int mustDie = 0;
 
    if((mem_ID = shmget(MEM_KEY, N_CARS*sizeof(f1Car), IPC_CREAT | 0660 )) < 0){
        perror("Une erreur est survenue durant l'alignement des voitures: ");
@@ -53,11 +58,6 @@ int main(int argc, char *argv[]){
        voitures[i].writingLock = 0;
    }
    
-   *((f1Car*)memoire) = *voitures;
-   f1Car* nouvellesVoitures = (f1Car *)memoire;
-   f1Car laPremiereVoiture2 = voitures[0];
-   printf("%d\n", laPremiereVoiture2.carNumber);
-   
    int pid;
    int nProc;
    for(nProc = 0; nProc < N_CARS; nProc++){
@@ -69,7 +69,6 @@ int main(int argc, char *argv[]){
 
    if(pid == 0){
         int memSlot = 0;
-        int writingPipe = 0;
        
         f1Car* mem = (f1Car *)memoire;
         while(memSlot < N_CARS && mem[memSlot].writingLock == 1){
@@ -82,17 +81,21 @@ int main(int argc, char *argv[]){
         close(mainPipe[0]);
         int writeTo = mainPipe[1];
         int readFrom = pipes[memSlot][0];      
-       
+        
         if(memSlot == 21){
             //Je sais que je suis le dernier, je vais donc prévenir tout le monde
             while(memSlot > 0){
                 mem[memSlot--].writingLock = 0;
             }  
-            f1CarEvent readyEvent;
-            readyEvent.carCode = 21;
-            readyEvent.eventCode = 0;
-            write(writeTo, &readyEvent, sizeof(f1CarEvent));
+            f1CarEvent* readyEvent = malloc(sizeof(*readyEvent));
+            readyEvent->carCode = 21;
+            readyEvent->eventCode = 0;
+            printf("writeTo = %d\r\n", writeTo);
+            write(writeTo, readyEvent, sizeof(*readyEvent));
+            printf("write done\r\n");
         }
+        initCar(mem[memSlot], (void *)mem, memSlot, readFrom, writeTo);
+        startCar();
     }else{
         //close(pipes[memSlot][1]);
         close(mainPipe[1]);
@@ -102,33 +105,12 @@ int main(int argc, char *argv[]){
             close(pipes[d][0]);
             writeTo[d] = pipes[d][1];
         }
-        while(!mustDie){
-            //Read pipe loop
-            //GUI
-            //Response
-            //A un moment ou un autre...
-            mustDie = 1;
-        }                
-
-
-        //Je suis ton pere!
-//           _________
-//           III| |III
-//         IIIII| |IIIII
-//        IIIIII| |IIIIII
-//        IIIIII| |IIIIII
-//       IIIIIII| |IIIIIII
-//       IIIIIII\ /IIIIIII
-//      II (___)| |(___) II
-//     II  \    /D\    /  II
-//    II  \ \  /| |\  / /  II
-//   II    \_\/|| ||\/_/    II
-//  II     / O-------O \     II
-// II_____/   \|||||/   \_____II
-//       /               \
-//       |_______________|
+        printf("Pipe OK");
+        initReadStream(readFrom, writeTo);
+        initMemory(memoire);
+        printf("READY\r\n");
+        startManager();
    }
-    
    shmdt(memoire);
    shmctl(mem_ID, IPC_RMID, NULL);
 }
