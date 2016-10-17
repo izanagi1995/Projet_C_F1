@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -8,101 +9,106 @@
 #include <time.h>
 #include <errno.h>
 #include <limits.h>
-#include <boolean.h>
+#include <signal.h>
 #include "defs.h"
-#include "tools.c"
+#include "tools.h"
 
-
-volatile sig_atomic_t flag = 0;
+volatile sig_atomic_t flag;
 void sig_handler(int sig) {
 	flag = 1;
 }
 
+/**
+@argv[1] STATUS
+@argv[2:] list of pilote_id
+*/
 int main(int argc, char *argv[]){
-	int status = S_INIT;
+    if (argc < 2) {
+        printf("Usage: %s [race_type {1,2,3}] [car_id [car_id ...]]\n", argv[0]);
+        exit(1);
+    }
 
-	srand(time(NULL));
-	int i;
+    int i, j;
 
-	int cars[22] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
-	int cars_length = sizeof(cars) / sizeof(int);
+    // Get the status from argv[0]
+	int status = (int) strtol(argv[1], (char **)NULL, 10);
 
 
-	int msgqkey;
-	int msgqid;
+    // Dynamically get the list of pilotes
+	int *cars = (int*) malloc((argc - 1) * sizeof(int));
+    int cars_cnt = argc - 2;
+    for (i = 0; i < cars_cnt; i++) {
+        cars[i] = (int) strtol(argv[i + 2], (char **)NULL, 10);
+    }
+    
+
+    // Message queue
+    int msgq_key;
+    int msgq_id;
+
+    // Shared memory
+    int shm_key;
+    int shm_id;
+    pilote_status *shm_addrs;
+
+    pid_t pid;
+    pid_t *pids = (pid_t*) malloc(sizeof(pid_t) * cars_cnt);
+
+    // Update the seed of random
+    srand(time(NULL));
+
+
+    // Get a free message queue
 	do {
-		msgqkey = rand();
-		msgqid = msgget(rand(), IPC_CREAT | IPC_EXCL | 0660);
-	} while (errno == EEXIST)
-	msgqid = try_sys_call_int(msgqid, "msgget failure");
-	msgbuf buffer;
+		msgq_key = rand();
+		msgq_id = msgget(rand(), IPC_CREAT | IPC_EXCL | 0660);
+	} while (errno == EEXIST);
+	try_sys_call_int(msgq_id, "msgget failure");
 
-	pid_t pid;
-	pid_t *pids = malloc(sizeof(pid_t) * cars_length);
-	int shm_key;
-	int temp_id;
-	for (i = 0; i < cars_length; ++i) {
-		do {
-			shm_key = rand();
-			temp_id = shmget(shm_key, sizeof(f1_pilote), IPC_CREAT | IPC_EXCL | 0660);
-		} while (errno == EEXIST);
-		pid = try_sys_call_int(fork(), "fork failure");
-		if (pid == 0) break;
-		pids[i] = pid
-	}
+    // Get a free shared memory segment
+    do {
+        shm_key = rand();
+        shm_id = shmget(shm_key, sizeof(pilote_status), IPC_CREAT | IPC_EXCL | 0660);
+    } while (errno == EEXIST);
+    try_sys_call_int(shm_id, "shmget failure");
 
-	if (pid > 0) {
-		// Father
+    // Fork once by pilote
+	for (i = 0; i < cars_cnt; i++) {
+        pid = try_sys_call_int(fork(), "fork failure");
+        if (pid == 0) break;
+        pids[i] = pid;
+    }
 
-		signal(SIGALARM, sig_handler);
+	if (pid > 0) { // Father side
+        if ((shm_addrs = (pilote_status*) shmat(shm_id, NULL, 0)) == (void*) -1){
+            perror("shmat failure");
+            exit(1);
+        }
 
-		/* Init memory sharing
-		%2		=> mem_id given by shmget()
-		%2 + 1	=> att_id given by shmat()*/
-		int *shmems = malloc(sizeof(int) * cars_length * 2);
-		for (i = 0; i < cars_length * 2; i+=2) {
-			msgrcv(msgqid, buffer, sizeof(int), 1, 0);
-			shmems[i] = shmget((int) strtol(buffer->mtext, NULL, 10), sizeof(f1_pilote), 0660);
-			shmems[i + 1] = shmatt(shmems[i], NULL, 0);
-		}
+        pilote *pilotes = malloc(sizeof(pilote*) * cars_cnt);
+        for (i = 0; i < cars_cnt; i++) {
+            pilotes[i].process_id = pids[i];
+            pilotes[i].pilote_id = cars[i];
+            pilotes[i].status = &shm_addrs[i];
+        }
+        signal(SIGALRM, sig_handler);
 
-		/* Init the first lap for test race 1 */
-		sector_times *sector_times_T1 = malloc(sizeof(sector_times) * cars_length);
-		for (i = 0; i < cars_length; i++) {
-			f1_pilote *pilote = (f1_pilote *)shmems[i * 2 + 1];
-			f1_pilote->pilote_id = cars[i];
-			f1_pilote->times[0] = sector_times[i];
-		}
+        switch (status) {
+            case S_TEST_RACES:
+                break;
+            case S_QUALIFYING_RACES:
+                break;
+            case S_RACE:
+                break;
 
-		/* Start the race ! */
-		for (i = 0; i < cars_length; i++) kill(pids[i], SIGTERM);
-		alarm(T_T1);
-
-		while (!flag) {
-			// read pid from msgq
-			// save f1_pilote.s([123]) to sector_times[pid].s$1
-			// on s1 create a new sector_time, set pts
-		}
-		flag = 0;
+        }
 
 
 
-	} else {
-		// Child
-
-		// Register a signal to call sig_handler
-
-		char *shmkey_as_char = (char *) malloc(sizeof(int) * sizeof(char));
-		sprintf(shmkey_as_char, "%d", shm_key);
-		buffer = {1, shmkey_as_char}
-		msgsnd(msgqid, &buffer, sizeof(int))
-
-		while(true) {
-			if (flag == 1) break;
-			sleep(1);
-		}
-		flag = 0;
-
-
+	} else { // Child Side
+        int car_index = i;
+        int car = cars[car_index];
+        free(cars);
+        free(pids);
 	}
 }
