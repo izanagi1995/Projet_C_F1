@@ -41,6 +41,7 @@ void broadcast(f1CarEvent event){
     for(int i = 0; i < N_CARS; i++){
         write(writeStreams[i], (void*)&event, sizeof(f1CarEvent));
     }
+    printf("DONE BROADCAST\r\n");
 }
 
 void handleEventManager(){
@@ -63,8 +64,8 @@ void handleEventManager(){
             }
             break;
         default:
-            printf("WARNING DEFAULT");
-            printf("carCode : %d, eventCode : %d", lastEvent.carCode, lastEvent.eventCode);
+            printf("WARNING DEFAULT\r\n");
+            printf("carCode : %d, eventCode : %d\r\n", lastEvent.carCode, lastEvent.eventCode);
     }
 }
 

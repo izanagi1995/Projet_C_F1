@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
+#include <math.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <sys/time.h>
+#include <time.h>
 #include <sys/select.h>
 #include "defs.h"
 #include "manager.h"
@@ -16,14 +18,20 @@
 
 
 int main(){
+   srand(time(NULL));
    printf("Bienvenue au grand Tournoi de F1!\r\n");
    printf("Nous preparons le tournoi! \r\n");
    int mem_ID;
    void* memoire;
-   int pipes[22][2]; //Ce sont les receivers pour les voitures. Seul main y écrit
+   int pipes[N_CARS][2]; //Ce sont les receivers pour les voitures. Seul main y écrit
    int mainPipe[2];  //C'est le receiver pour le main. Les voitures y envoient les events
-   int carNums[22] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
-   
+   int carNums[N_CARS] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
+   int randKeys[N_CARS];
+
+   for(int i = 0; i < N_CARS; i++){
+       randKeys[i] = rand();
+   }   
+
 
    if((mem_ID = shmget(MEM_KEY, N_CARS*sizeof(f1Car), IPC_CREAT | 0660 )) < 0){
        perror("Une erreur est survenue durant l'alignement des voitures: ");
@@ -95,9 +103,8 @@ int main(){
             printf("write done\r\n");
         }
         initCar(mem[memSlot], (void *)mem, memSlot, readFrom, writeTo);
-        startCar();
+        startCar(randKeys[memSlot]);
     }else{
-        //close(pipes[memSlot][1]);
         close(mainPipe[1]);
         int readFrom = mainPipe[0];
         int writeTo[22];

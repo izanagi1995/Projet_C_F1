@@ -12,6 +12,11 @@
 #define QUALIFICATION 3
 #define COURSE        4
 
+//CAR STATUS
+//#define WAITING     0
+#define GOT_MODE      1 //Got mode but not time or laps
+#define RACE          2
+
 /*
  * Specs code
  * ==========
@@ -25,7 +30,7 @@
  * FROM MANAGER
  * ------------
  * 11 : Specify in carCode the next race time or laps
- * 12 : Specify mode in carCode (0: time, 1: laps)
+ * 12 : Specify mode in eventCode (0: time, 1: laps)
  */
 typedef struct{
     unsigned int carCode;
