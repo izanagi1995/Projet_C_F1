@@ -70,3 +70,77 @@ Durant la course, différents drapeaux peuvent être présentés aux pilotes :
 * Drapeau rouge : arrêt de la course et re-départ depuis la voie des stands, dans l’ordre du classement actuel.
 * Voiture de sécurité : tout le monde suit. Attention : le nombre de tours à faire lors de la course continue à diminuer !
 * Lorsque la voiture de sécurité va rentrer, tous les pilotes « dépassés » doivent reprendre leur place dans l’ordre du classement actuel. Ils ont 2 tours pour se remettre à leur place en dépassant. Lorsque cela est fait, la voiture de sécurité rentre et la course reprend.
+
+# Algo
+
+## Avant le fork
+
+Ces variables seront partagées mais ne pourront pas être éditées!
+
+* Initialisation des temps/tours des différentes étapes
+* Enumeration des numeros des voitures
+* Initialisation de la mémoire partagée
+* Initialisation de la message queue (PILOTES => SERVEUR)
+* Mise en forme de la mémoire partagée
+* Initialisation de la sémaphore "lock memoire"
+* __FORK__ :sparkles:
+
+## Après le fork
+
+### Serveur
+
+```
+Soit compteurEtape = 0
+Tant que compteurEtape <= 7
+	Si compteurEtape < 3
+		Pour chaque pilote
+			Envoyer SIGNAL START
+			Tant que le message sur la message queue n'est pas celui de fin
+				Gerer message
+				Lire memoire
+				Faire affichage
+		
+	Sinon si compteurEtape != 7
+		Soit nombreMessageFinRecu = 0
+		Pour chaque pilote
+			Envoyer SIGNAL START
+		Tant que nombreMessageFinRecu < nombrePilote
+			Si messageRecu est message de fin
+				nombreMessageFinRecu++;
+			Lire memoire
+			Faire affichage
+	Sinon //C'est la course
+		Pour chaque pilote
+			Envoyer SIGNAL START
+		Tant que nombreMessageFinRecu < nombrePilote
+			Si messageRecu est message de fin
+				nombreMessageFinRecu++;
+			Si messageRecu est message d'abandon
+				Disqualifier voiture
+			Lire memoire
+			Faire affichage
+	compteurEtape++
+```
+
+### Voiture
+
+```
+A la reception d'un signal start
+	Soit secteur = 0;
+	Soit restant = valeur lue depuis le tableau des temps et des types
+	Tant que restant > 0
+		Soit abandon = random
+		Soit pit = random
+		Si abandon
+			Envoyer message abandon
+		Sinon si secteur = 3 et pit
+			Envoyer message pitEnter
+			Attendre random
+			Envoyer message pitLeft
+		Sinon
+			Soit temps = random
+			Ecrire temps en memoire
+			Attendre temps
+			restant -= temps
+			Envoyer un message LEFT_SECTOR
+	Envoyer un message FIN
