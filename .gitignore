@@ -32,3 +32,6 @@ main
 # Debug files
 *.dSYM/
 *.su
+
+# CLion
+.idea/*

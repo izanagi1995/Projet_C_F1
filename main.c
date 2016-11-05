@@ -1,123 +1,220 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
-#include <math.h>
-#include <math.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
+#include <stdlib.h>
 #include <sys/shm.h>
+#include <errno.h>
 #include <time.h>
-#include <sys/select.h>
-#include "defs.h"
-#include "manager.h"
-#include "car.h"
+#include <sys/wait.h>
+#include "defs.c"
+#include "func.c"
 
-//DEBUG
-#define PRINT_OPAQUE_STRUCT(p)  print_mem((p), sizeof(*(p)))
-//END DEBUG
+int main(int argc, char *argv[]) {
+	/* Cars have to be sent through the args of the cli */
+	if (argc == 1) {
+		printf("Usage: %s car_id [car_id [car_id ...]]\n", argv[0]);
+	}
+
+	/* Init variable */
+	int i, loop_count, tmp, race;
+	size_t cars_cnt;
+	int* cars;
+	int* pipes;
+	int shm_key, shm_id;
+	pid_t* pids;
+    srand((unsigned int) time(NULL));
+
+	/* Read the args to get the cars */
+	cars_cnt = (size_t) argc - 1;
+	cars = (int*) try_sys_call_ptr(calloc(cars_cnt, sizeof(int)), "Malloc failure");
+    for (i = 0; i < cars_cnt; i++) {
+        cars[i] = (int) strtol(argv[i + 1], (char **)NULL, 10);
+        printf("Got car #%d: %d\n", i, cars[i]);
+	}
+
+	/* Init the pipes */
+	pipes = (int*) try_sys_call_ptr(calloc(cars_cnt * 2, sizeof(int)), "Malloc failure");
+	for (i = 0; i < cars_cnt; i++) {
+		try_sys_call_int(pipe(&pipes[i * 2]), "Pipe failure");
+	}
+    printf("%d pipes initialized.\n", (int) cars_cnt * 2);
+
+	/*	Init the shamed memory with a random key. Fail after 30 try*/
+	loop_count = 0;
+	do {
+		shm_key = rand();
+		shm_id = shmget(shm_key, cars_cnt * sizeof(pilote), IPC_CREAT | IPC_EXCL | 0660);
+	} while (loop_count++ < 30 && errno == EEXIST);
+	try_sys_call_int(shm_id, "Shmget failure");
+    printf("Shared memory has ID: %d\n", shm_id);
+
+	/* Fork */
+	pids = (pid_t*) try_sys_call_ptr(malloc(cars_cnt * sizeof(pid_t)), "Malloc failure");
+	for (i = 0; i < cars_cnt; i++) {
+		pids[i] = try_sys_call_int(fork(), "Fork failure");
+		if (pids[i] == 0) break;
+	}
+
+	/* Child */
+	if (i < cars_cnt) {
+        /* Init variable */
+        int sig, car_idx, pipe;
+        sigset_t sigset;
+
+		/* Save the index in cars and free useless arrays */
+		car_idx = i;
+		free(cars);
+		free(pids);
+
+		/* Attach the shared memory and get our structure */
+        pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
+        pilote myself = shm_addr[car_idx];
+
+		/* Save one pipe with write acces to the server
+		 * close all the other
+		 * free the memory segment of pipes */
+		pipe = pipes[car_idx * 2 + 1];
+		for (i = 0; i < cars_cnt; i++) {
+			try_sys_call_int(close(pipes[i * 2]), "Pipe close failure");
+			if (i != car_idx) {
+				try_sys_call_int(close(pipes[i * 2 + 1]), "Pipe close failure");
+			}
+			
+		}
+		free(pipes);
+
+        printf("Process ID %d is car at index %d and has access to %p.\n", getpid(), car_idx, &myself);
+
+		/* Signals handled by signal syscall */
+		signal(SIG_RACE_STOP, sighandler);
+
+        /* Signals handled by sigwait syscall */
+		sigemptyset(&sigset);
+		sigaddset(&sigset, SIG_RACE_START);
+		sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+		/* Loop until the pilote loose */
+		while (myself.status != end) {
+			/* Wait for the race start */
+            if (sigwait(&sigset, &sig) != 0) {
+                perror("Sigwait failure");
+                exit(EXIT_FAILURE);
+            }
+
+            /* Enter main loop, break when SIG_RACE_STOP is fired */
+			printf("Race started\n");
+            flag_race_stop = 0;
+            while (!flag_race_stop) {
+                sleep(1);
+
+                // Variables:
+                // pilote* myself: pointer to the section of shared memory usable by this pilote
+                // int pipe: fd with write access to the server
+                // ======= TODO ========
+                //
+
+            }
+		}
+
+        printf("Pilote %d end the tournament !", myself.car_id);
+        try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
+        exit(EXIT_SUCCESS);
 
 
-int main(){
-   srand(time(NULL));
-   printf("Bienvenue au grand Tournoi de F1!\r\n");
-   printf("Nous preparons le tournoi! \r\n");
-   int mem_ID;
-   void* memoire;
-   int pipes[N_CARS][2]; //Ce sont les receivers pour les voitures. Seul main y écrit
-   int mainPipe[2];  //C'est le receiver pour le main. Les voitures y envoient les events
-   int carNums[N_CARS] = {44, 6, 5, 7, 3, 33, 19, 77, 11, 27, 26, 55, 14, 22, 9, 12, 20, 30, 8, 21, 31, 94};
-   int randKeys[N_CARS];
+	/* Father */
+	} else {
+        printf("Server started\n");
 
-   for(int i = 0; i < N_CARS; i++){
-       randKeys[i] = rand();
-   }   
-
-
-   if((mem_ID = shmget(MEM_KEY, N_CARS*sizeof(f1Car), IPC_CREAT | 0660 )) < 0){
-       perror("Une erreur est survenue durant l'alignement des voitures: ");
-       exit(1);
-   }
-
-   for(int j = 0; j < N_CARS; j++){
-      if((pipe(pipes[j])) != 0){
-          perror("Une erreur est survenue lors de l'envoi des invitations: ");
-          exit(1);
-      }
-   }
-   if((pipe(mainPipe)) != 0){
-       perror("Un hamster a retourné notre serveur mail, nous ne pouvons plus communiquer: ");
-       exit(1);
-   }
-
-   if ((memoire = shmat(mem_ID, NULL, 0)) == (void*) -1){
-       perror("Une erreur est survenue lors de l'assignation des places: ");
-       exit(1);
-   }
-
-   
-    
-   //TOUT LE STUFF EST A FAIRE ICI ! :D
-   
-   f1Car* voitures = (f1Car *)memoire;
-   
-   for(int i = 0; i < N_CARS; i++){
-       voitures[i].writingLock = 1;
-       voitures[i].carNumber = carNums[i];
-       voitures[i].writingLock = 0;
-   }
-   
-   int pid;
-   int nProc;
-   for(nProc = 0; nProc < N_CARS; nProc++){
-       pid = fork();
-       if(pid == 0){
-           break;
-       }
-   }
-
-   if(pid == 0){
-        int memSlot = 0;
-       
-        f1Car* mem = (f1Car *)memoire;
-        while(memSlot < N_CARS && mem[memSlot].writingLock == 1){
-            memSlot++;
+        /* Close pipes with write access
+         * Rearrange pipes with read access from the head of the array
+         * realloc to free spaces */
+        for (i = 0; i < cars_cnt * 2; i++) {
+            close(pipes[i * 2 + 1]);
+            pipes[i] = pipes[i * 2];
         }
-        mem[memSlot].writingLock = 1;
-        printf("%d\n", memSlot);
-        
-        close(pipes[memSlot][1]);
-        close(mainPipe[0]);
-        int writeTo = mainPipe[1];
-        int readFrom = pipes[memSlot][0];      
-        
-        if(memSlot == 21){
-            //Je sais que je suis le dernier, je vais donc prévenir tout le monde
-            while(memSlot > 0){
-                mem[memSlot--].writingLock = 0;
-            }  
-            f1CarEvent* readyEvent = malloc(sizeof(*readyEvent));
-            readyEvent->carCode = 21;
-            readyEvent->eventCode = 0;
-            printf("writeTo = %d\r\n", writeTo);
-            write(writeTo, readyEvent, sizeof(*readyEvent));
-            printf("write done\r\n");
+        realloc(pipes, cars_cnt * sizeof(int));
+
+
+		/* Attach the shared memory, fill the structure and free the array of cars */
+		pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
+		for (i = 0; i < cars_cnt; i++) {
+			shm_addr[i].car_id = cars[i];
+            shm_addr[i].status = driving;
+		}
+		free(cars);
+
+        /* Debug */
+        char buffer[256];
+        printf("Press ENTER to continue ");
+        scanf(buffer);
+        /* End debug */
+
+        printf("[S] Enter main loop\n");
+		for (race = 0; race < 7; race++) {
+
+            /* Wait one second to sync everyone*/
+            printf("[S] Sync cars...\n");
+            sleep(1);
+
+			/* Start a race */
+            printf("[S] Start race %d:%d !\n", race / 3 + 1, race % 3 + 1);
+			for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_START);
+
+            /* Enter main loop with specific code by race type */
+            switch (race) {
+                case 0:
+                case 1:
+                case 2:
+                    /* Loop until the alarm signal is fired */
+                    alarm(test_times[race]);
+                    flag_alarm = 0;
+                    while (!flag_alarm) {
+                        /* Main loop for test races */
+
+                        /* TODO
+                         * available variable are:
+                         * int pipes[]: array of pipe with read access
+                         * pid_t pids[]: array of child's process
+                         * int cars_cnt: number of pilotes
+                         * int race: the id of the race (0-2: test, 3-5: qualif, 6: race)
+                         * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
+
+                    }
+                    break;
+                case 3:
+                case 4:
+                case 5:
+                    /* Loop until the alarm signal is fired */
+                    alarm(qualif_times[race % 3]);
+                    flag_alarm = 0;
+                    while (!flag_alarm) {
+                        /* Main loop for qualification races */
+
+                        // TODO
+
+                    }
+                    break;
+                case 6:
+
+                    // TODO
+
+                    break;
+            }
+
+            /* Stop the current race */
+            printf("End race !\n");
+            for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_STOP);
+		}
+
+        /* Detache the shared memory */
+        try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
+
+        /* Wait for children to stop */
+        for (i = 0; i < cars_cnt; i++) {
+            printf("[S] Wait for child %d to stop.\n", pids[i]);
+            try_sys_call_int(waitpid(pids[i], &tmp, 0), "Waitpid failure");
         }
-        initCar(mem[memSlot], (void *)mem, memSlot, readFrom, writeTo);
-        startCar(randKeys[memSlot]);
-    }else{
-        close(mainPipe[1]);
-        int readFrom = mainPipe[0];
-        int writeTo[22];
-        for(int d = 0; d < N_CARS; d++){
-            close(pipes[d][0]);
-            writeTo[d] = pipes[d][1];
-        }
-        printf("Pipe OK");
-        initReadStream(readFrom, writeTo);
-        initMemory(memoire);
-        printf("READY\r\n");
-        startManager();
-   }
-   shmdt(memoire);
-   shmctl(mem_ID, IPC_RMID, NULL);
+
+        exit(EXIT_SUCCESS);
+	}
 }
