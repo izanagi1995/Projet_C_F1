@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include "defs.h"
 
 int try_sys_call_int(int syscall_ret, char* msg_on_fail) {
 	if (syscall_ret != -1) return syscall_ret;

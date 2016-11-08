@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/wait.h>
-#include "defs.c"
-#include "func.c"
+#include "defs.h"
+#include "func.h"
 
 int main(int argc, char *argv[]) {
 	/* Cars have to be sent through the args of the cli */

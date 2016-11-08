@@ -30,7 +30,7 @@ struct bestlap {
 	float best_s2;
 	float best_s3;
 	float best_lap;
-}
+};
 
 /* The scoreboard for each pilote */
 typedef struct scoreboard scoreboard;
