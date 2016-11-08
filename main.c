@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
 	/* Cars have to be sent through the args of the cli */
 	if (argc == 1) {
 		printf("Usage: %s car_id [car_id [car_id ...]]\n", argv[0]);
+        exit(1);
 	}
 
 	/* Init variable */
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
 
 		/* Attach the shared memory and get our structure */
         pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
-        pilote myself = shm_addr[car_idx];
+        pilote* myself = &shm_addr[car_idx];
 
 		/* Save one pipe with write acces to the server
 		 * close all the other
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]) {
 		}
 		free(pipes);
 
-        printf("Process ID %d is car at index %d and has access to %p.\n", getpid(), car_idx, &myself);
+        printf("Process ID %d is car at index %d and has access to %p.\n", getpid(), car_idx, myself);
 
 		/* Signals handled by signal syscall */
 		signal(SIG_RACE_STOP, sighandler);
@@ -94,7 +95,7 @@ int main(int argc, char *argv[]) {
 		sigprocmask(SIG_BLOCK, &sigset, NULL);
 
 		/* Loop until the pilote loose */
-		while (myself.status != end) {
+		while (myself->status != end) {
 			/* Wait for the race start */
             if (sigwait(&sigset, &sig) != 0) {
                 perror("Sigwait failure");
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
             }
 		}
 
-        printf("Pilote %d end the tournament !", myself.car_id);
+        printf("Pilote %d end the tournament !", myself->car_id);
         try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
         exit(EXIT_SUCCESS);
 
