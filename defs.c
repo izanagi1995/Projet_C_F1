@@ -5,6 +5,7 @@ unsigned int test_times[] = {90, 90, 60};
 unsigned int qualif_times[] = {18, 15, 12};
 int race_laps = 50;
 
+/* Valid status for pilote.status */
 typedef enum status status;
 enum status {
     driving,
@@ -13,33 +14,38 @@ enum status {
     end
 };
 
+/* A queue of laps, each the time by sector and a pointer to the next lap */
 typedef struct lap lap;
 struct lap {
-	lap* prevlap;
 	lap* nextlap;
 	float time_s1;
 	float time_s2;
 	float time_s3;
 };
 
-typedef struct races races;
-struct races {
+/* Best time by sector and best lap time */
+typedef struct bestlap bestlap;
+struct bestlap {
+	float best_s1;
+	float best_s2;
+	float best_s3;
+	float best_lap;
+}
+
+/* The scoreboard for each pilote */
+typedef struct scoreboard scoreboard;
+struct scoreboard {
 	int car_id;
-	lap* races[7];
-	struct bestlap {
-		float time_s1;
-		float time_s2;
-		float time_s3;
-		float time_lap;
-	} bestlap;
+	lap* races[7]; // Point the first lap of each race
+	bestlap bestlaps[7];
 };
 
+/* Shared structure, used by pilotes to give infos on their race */
 typedef struct pilote pilote;
 struct pilote {
 	int car_id;
-    int lap;
+	int lap_cnt;
 	int sector;
 	float time;
 	status status;
-    races* races;
 };
