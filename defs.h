@@ -1,9 +1,9 @@
 #define SIG_RACE_START (SIGUSR1)
 #define SIG_RACE_STOP (SIGUSR2)
 
-unsigned int test_times[] = {90, 90, 60};
-unsigned int qualif_times[] = {18, 15, 12};
-int race_laps = 50;
+static const unsigned int test_times[] = {90, 90, 60};
+static const unsigned int qualif_times[] = {18, 15, 12};
+static const int race_laps = 50;
 
 /* Valid status for pilote.status */
 typedef enum status status;
