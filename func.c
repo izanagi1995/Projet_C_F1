@@ -12,6 +12,7 @@ int try_sys_call_int(int syscall_ret, char* msg_on_fail) {
 void* try_sys_call_ptr(void* syscall_ret, char* msg_on_fail) {
 	if (syscall_ret != NULL) return syscall_ret;
 	perror(msg_on_fail);
+	exit(EXIT_FAILURE);
 }
 
 volatile sig_atomic_t flag_alarm;
