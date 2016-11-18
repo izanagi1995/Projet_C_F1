@@ -150,6 +150,8 @@ int main(int argc, char *argv[]) {
 		scanf(buffer);
 		/* End debug */
 
+		signal(SIGALRM, sighandler);
+		
 		printf("[S] Enter main loop\n");
 		for (race = 0; race < 7; race++) {
 
