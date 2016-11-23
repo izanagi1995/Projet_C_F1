@@ -114,6 +114,10 @@ int main(int argc, char *argv[]) {
 				// ======= TODO ========
 				//
 
+
+                // Todo : Lancer le temps, Déterminer le timming de la voiture, l'enrengistrer, incrémenté le lap, recommencer;
+
+
 			}
 		}
 
@@ -141,6 +145,9 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < cars_cnt; i++) {
 			shm_addr[i].car_id = cars[i];
 			shm_addr[i].status = driving;
+            shm_addr[i].lap_cnt= 0;
+            shm_addr[i].sector = 0;
+            shm_addr[i].time = 0;
 		}
 		free(cars);
 
