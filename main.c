@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 
 				doSector(myself, time, pipe);
 
-                if((rand() % 50) < 10){
+                if((rand() % 100) < 5){
 					myself->status = end;
                     myself->has_changed = 1;
 				}
