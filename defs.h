@@ -1,7 +1,7 @@
 #define SIG_RACE_START (SIGUSR1)
 #define SIG_RACE_STOP (SIGUSR2)
 
-static const unsigned int test_times[] = {90, 90, 60};
+static const unsigned int test_times[] = {10, 10, 10};
 static const unsigned int qualif_times[] = {18, 15, 12};
 static const int race_laps = 50;
 

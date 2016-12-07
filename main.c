@@ -5,6 +5,8 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include "defs.h"
 #include "func.h"
@@ -58,6 +60,9 @@ int main(int argc, char *argv[]) {
 
 	/* Child */
 	if (i < cars_cnt) {
+
+		srand((unsigned int) time(NULL));
+
 		/* Init variable */
 		int sig, car_idx, pipe;
 		sigset_t sigset;
@@ -80,7 +85,7 @@ int main(int argc, char *argv[]) {
 			if (i != car_idx) {
 				try_sys_call_int(close(pipes[i * 2 + 1]), "Pipe close failure");
 			}
-			
+
 		}
 		free(pipes);
 
@@ -106,13 +111,27 @@ int main(int argc, char *argv[]) {
 			printf("Race started\n");
 			flag_race_stop = 0;
 			while (!flag_race_stop) {
-				sleep(1);
-
 				// Variables:
 				// pilote* myself: pointer to the section of shared memory usable by this pilote
 				// int pipe: fd with write access to the server
 				// ======= TODO ========
 				//
+
+                if(myself->status == end){
+					char status[] = "end";
+					write(pipe, status, sizeof(status));
+                    break;
+                }
+				int intTime = rand() % 50 + 50;
+				float time = (float)(intTime);
+
+				doSector(myself, time, pipe);
+
+                if((rand() % 50) > 10){
+					myself->status = end;
+				}
+
+				sleep(intTime);
 
 			}
 		}
@@ -163,6 +182,8 @@ int main(int argc, char *argv[]) {
 			printf("[S] Start race %d:%d !\n", race / 3 + 1, race % 3 + 1);
 			for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_START);
 
+
+
 			/* Enter main loop with specific code by race type */
 			switch (race) {
 				case 0:
@@ -181,6 +202,12 @@ int main(int argc, char *argv[]) {
 						 * int cars_cnt: number of pilotes
 						 * int race: the id of the race (0-2: test, 3-5: qualif, 6: race)
 						 * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
+
+                        //READ PIPE
+                        //IF DATA ON PIPE, READ MEM DATA
+                            //UPDATE GUI
+
+
 
 					}
 					break;
