@@ -118,13 +118,15 @@ int main(int argc, char *argv[]) {
 				//
 
 
-				int intTime = rand() % 50 + 50;
+				//int intTime = rand() % 50 + 50;
+                int intTime = 1;
 				float time = (float)(intTime);
 
 				doSector(myself, time, pipe);
 
                 if((rand() % 50) < 10){
 					myself->status = end;
+                    myself->has_changed = 1;
 				}
 				sem_post(sem);
                 if(myself->status == end){
@@ -147,12 +149,11 @@ int main(int argc, char *argv[]) {
 	/* Father */
 	} else {
 		printf("Server started\n");
-
-
         int pipe = pipes[0];
         close(pipes[1]);
 
-
+        //Init scoreboard
+        scoreboard* scoreboards = calloc(cars_cnt, sizeof(scoreboard));
 
 		//CRITICAL SECTION
 		sem_wait(sem);
@@ -206,7 +207,18 @@ int main(int argc, char *argv[]) {
 						 * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
                         int data = flush_pipe(pipe);
                         if(data != 0){
-                            printf("DATA\n");
+                            //CRITICAL SECTION
+                            sem_wait(sem);
+
+                            for (i = 0; i < cars_cnt; i++){
+                                pilote* current = &shm_addr[i];
+                                if(current->has_changed == 1){
+                                    printf("Pilote %d has updated\n", current->car_id);
+                                    current->has_changed = 0;
+                                }
+                            }
+
+                            sem_post(sem);
                         }
 
 

@@ -48,4 +48,5 @@ struct pilote {
 	int sector;
 	float time;
 	status status;
+	int has_changed;
 };

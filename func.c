@@ -78,6 +78,7 @@ void doSector(pilote* p, float time, int pipe){
     if(++(p->sector) == 3){
         p->sector = 0;
         p->lap_cnt++;
+        p->has_changed = 1;
     }
     char status[] = "driving";
     write(pipe, status, sizeof(status));
