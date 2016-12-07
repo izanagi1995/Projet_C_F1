@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
+
 #include "defs.h"
 
 int try_sys_call_int(int syscall_ret, char* msg_on_fail) {
@@ -15,6 +20,16 @@ void* try_sys_call_ptr(void* syscall_ret, char* msg_on_fail) {
 	perror(msg_on_fail);
 	exit(EXIT_FAILURE);
 }
+
+sem_t* sem;
+
+void init_semaphore(){
+    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, 1);
+    sem_unlink ("pSem");
+    // 1 = Only 1 process at a time doing action on shm
+}
+
+
 
 volatile sig_atomic_t flag_alarm;
 volatile sig_atomic_t flag_race_stop;

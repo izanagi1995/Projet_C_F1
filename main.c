@@ -5,9 +5,9 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include <time.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 #include "defs.h"
 #include "func.h"
 
@@ -18,6 +18,8 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	init_semaphore();
+
 	/* Init variable */
 	int i, loop_count, tmp, race;
 	size_t cars_cnt;
@@ -25,6 +27,7 @@ int main(int argc, char *argv[]) {
 	int* pipes;
 	int shm_key, shm_id;
 	pid_t* pids;
+
 	srand((unsigned int) time(NULL));
 
 	/* Read the args to get the cars */
@@ -61,7 +64,7 @@ int main(int argc, char *argv[]) {
 	/* Child */
 	if (i < cars_cnt) {
 
-		srand((unsigned int) time(NULL));
+        srand(time(NULL) ^ (getpid()<<16));
 
 		/* Init variable */
 		int sig, car_idx, pipe;
@@ -111,32 +114,38 @@ int main(int argc, char *argv[]) {
 			printf("Race started\n");
 			flag_race_stop = 0;
 			while (!flag_race_stop) {
+
+				//CRITICAL SECTION
+				sem_wait(sem);
 				// Variables:
 				// pilote* myself: pointer to the section of shared memory usable by this pilote
 				// int pipe: fd with write access to the server
 				// ======= TODO ========
 				//
 
-                if(myself->status == end){
-					char status[] = "end";
-					write(pipe, status, sizeof(status));
-                    break;
-                }
+
 				int intTime = rand() % 50 + 50;
 				float time = (float)(intTime);
 
 				doSector(myself, time, pipe);
 
-                if((rand() % 50) > 10){
+                if((rand() % 50) < 10){
 					myself->status = end;
 				}
+				sem_post(sem);
+                if(myself->status == end){
+                    printf("Pilote %d left the tournament! \n", myself->car_id);
+                    char status[] = "end";
+                    write(pipe, status, sizeof(status));
+                    break;
+                }
 
 				sleep(intTime);
 
 			}
 		}
 
-		printf("Pilote %d end the tournament !", myself->car_id);
+		//printf("Pilote %d left the tournament! \n", myself->car_id);
 		try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
 		exit(EXIT_SUCCESS);
 
@@ -154,13 +163,15 @@ int main(int argc, char *argv[]) {
 		}
 		realloc(pipes, cars_cnt * sizeof(int));
 
-
+		//CRITICAL SECTION
+		sem_wait(sem);
 		/* Attach the shared memory, fill the structure and free the array of cars */
 		pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
 		for (i = 0; i < cars_cnt; i++) {
 			shm_addr[i].car_id = cars[i];
 			shm_addr[i].status = driving;
 		}
+		sem_post(sem);
 		free(cars);
 
 		/* Debug */

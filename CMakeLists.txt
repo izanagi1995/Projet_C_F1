@@ -10,3 +10,4 @@ set(SOURCE_FILES
     main.c)
 
 add_executable(Projet_C_F1 ${SOURCE_FILES})
+target_link_libraries(Projet_C_F1 pthread)
