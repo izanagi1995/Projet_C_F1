@@ -11,6 +11,7 @@ void sighandler(int sig);
 void doSector(pilote* p, float time, int pipe);
 extern sem_t* sem;
 void init_semaphore();
+int flush_pipe(int pipe);
 extern volatile sig_atomic_t flag_alarm;
 extern volatile sig_atomic_t flag_race_stop;
 

@@ -7,6 +7,10 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 
+#define _GNU_SOURCE
+#include <signal.h>
+#include <poll.h>
+
 #include "defs.h"
 
 int try_sys_call_int(int syscall_ret, char* msg_on_fail) {
@@ -29,7 +33,31 @@ void init_semaphore(){
     // 1 = Only 1 process at a time doing action on shm
 }
 
+/**
+ * Flush a pipe and returns data availabilty
+ * @param pipe the pipe descriptor
+ * @return 0 if no data were available, anything else if there was something on the pipe
+ */
+int flush_pipe(int pipe){
+    char buffer[256];
 
+    if (poll(&(struct pollfd){ .fd = pipe, .events = POLLIN }, 1, 0)==1) {
+        while(1){
+            if (poll(&(struct pollfd){ .fd = pipe, .events = POLLIN }, 1, 0)==1) {
+                read(pipe, &buffer, sizeof(buffer));
+            }else{
+                break;
+            }
+        }
+
+        return 1;
+    }else{
+
+        return 0;
+    }
+
+
+}
 
 volatile sig_atomic_t flag_alarm;
 volatile sig_atomic_t flag_race_stop;

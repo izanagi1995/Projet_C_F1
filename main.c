@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 	int i, loop_count, tmp, race;
 	size_t cars_cnt;
 	int* cars;
-	int* pipes;
+	int pipes[2];
 	int shm_key, shm_id;
 	pid_t* pids;
 
@@ -39,11 +39,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Init the pipes */
-	pipes = (int*) try_sys_call_ptr(calloc(cars_cnt * 2, sizeof(int)), "Malloc failure");
+    try_sys_call_int(pipe(pipes), "Pipe failure");
 	for (i = 0; i < cars_cnt; i++) {
-		try_sys_call_int(pipe(&pipes[i * 2]), "Pipe failure");
+
 	}
-	printf("%d pipes initialized.\n", (int) cars_cnt * 2);
+	printf("pipes initialized.\n");
 
 	/*	Init the shamed memory with a random key. Fail after 30 try*/
 	loop_count = 0;
@@ -82,15 +82,9 @@ int main(int argc, char *argv[]) {
 		/* Save one pipe with write acces to the server
 		 * close all the other
 		 * free the memory segment of pipes */
-		pipe = pipes[car_idx * 2 + 1];
-		for (i = 0; i < cars_cnt; i++) {
-			try_sys_call_int(close(pipes[i * 2]), "Pipe close failure");
-			if (i != car_idx) {
-				try_sys_call_int(close(pipes[i * 2 + 1]), "Pipe close failure");
-			}
-
-		}
-		free(pipes);
+		pipe = pipes[1];
+		close(pipes[0]);
+		//free(pipes);
 
 		printf("Process ID %d is car at index %d and has access to %p.\n", getpid(), car_idx, myself);
 
@@ -154,14 +148,11 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("Server started\n");
 
-		/* Close pipes with write access
-		 * Rearrange pipes with read access from the head of the array
-		 * realloc to free spaces */
-		for (i = 0; i < cars_cnt * 2; i++) {
-			close(pipes[i * 2 + 1]);
-			pipes[i] = pipes[i * 2];
-		}
-		realloc(pipes, cars_cnt * sizeof(int));
+
+        int pipe = pipes[0];
+        close(pipes[1]);
+
+
 
 		//CRITICAL SECTION
 		sem_wait(sem);
@@ -208,15 +199,16 @@ int main(int argc, char *argv[]) {
 
 						/* TODO
 						 * available variable are:
-						 * int pipes[]: array of pipe with read access
+						 * int pipe: the pipe
 						 * pid_t pids[]: array of child's process
 						 * int cars_cnt: number of pilotes
 						 * int race: the id of the race (0-2: test, 3-5: qualif, 6: race)
 						 * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
+                        int data = flush_pipe(pipe);
+                        if(data != 0){
+                            printf("DATA\n");
+                        }
 
-                        //READ PIPE
-                        //IF DATA ON PIPE, READ MEM DATA
-                            //UPDATE GUI
 
 
 
