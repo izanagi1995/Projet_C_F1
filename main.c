@@ -119,6 +119,12 @@ int main(int argc, char *argv[]) {
 				int intTime = rand()%10 + 5;
 				float time = (float)(intTime);
 
+                if(myself->sector == 2){
+                    if((rand() % 100) < 10){
+                        myself->status = pitstop;
+                        myself->has_changed = 1;
+                    }
+                }
 
 				doSector(myself, time, pipe);
 
@@ -126,6 +132,8 @@ int main(int argc, char *argv[]) {
 					myself->status = out;
                     myself->has_changed = 1;
 				}
+
+
 				sem_post(sem);
                 if(myself->status == out){
                     char status[] = "out";
@@ -134,6 +142,8 @@ int main(int argc, char *argv[]) {
                 }
 
 				sleep(intTime);
+
+                if(myself->status == pitstop) myself->status = driving;
 
 			}
 		}
@@ -241,6 +251,10 @@ int main(int argc, char *argv[]) {
                                     if(current->status == out ){
                                         printf("car %d left\n", current->car_id);
                                         continue;
+                                    }
+                                    if(current->status == pitstop){
+                                        printf("Car %d is in the pit\n", current->car_id);
+                                        scb->last_lap[race]->time_pit = current->time;
                                     }
                                     if(current->sector == 0){
                                         printf("Car %d has done a lap\n", current->car_id);
