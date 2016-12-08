@@ -21,6 +21,7 @@ struct lap {
 	float time_s1;
 	float time_s2;
 	float time_s3;
+    float time_pit;
 };
 
 /* Best time by sector and best lap time */
