@@ -74,12 +74,15 @@ void sighandler(int sig) {
 }
 
 void doSector(pilote* p, float time, int pipe){
+
+
     p->time = time;
+
     if(++(p->sector) == 3){
         p->sector = 0;
         p->lap_cnt++;
-        p->has_changed = 1;
     }
+    p->has_changed = 1;
     char status[] = "driving";
     write(pipe, status, sizeof(status));
 }

@@ -1,7 +1,7 @@
 #define SIG_RACE_START (SIGUSR1)
 #define SIG_RACE_STOP (SIGUSR2)
 
-static const unsigned int test_times[] = {10, 10, 10};
+static const unsigned int test_times[] = {60, 60, 60};
 static const unsigned int qualif_times[] = {18, 15, 12};
 static const int race_laps = 50;
 
@@ -37,6 +37,7 @@ typedef struct scoreboard scoreboard;
 struct scoreboard {
 	int car_id;
 	lap* races[7]; // Point the first lap of each race
+	lap* last_lap[7]; //Point to races[i]->nextLap->nextLap->...->nextLap, the current lap
 	bestlap bestlaps[7];
 };
 

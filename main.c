@@ -109,6 +109,10 @@ int main(int argc, char *argv[]) {
 			flag_race_stop = 0;
 			while (!flag_race_stop) {
 
+                if(myself->status == end){
+                    printf("PROBLEM status = end\n");
+                }
+
 				//CRITICAL SECTION
 				sem_wait(sem);
 				// Variables:
@@ -118,9 +122,9 @@ int main(int argc, char *argv[]) {
 				//
 
 
-				//int intTime = rand() % 50 + 50;
-                int intTime = 1;
+				int intTime = rand()%10 + 5;
 				float time = (float)(intTime);
+
 
 				doSector(myself, time, pipe);
 
@@ -130,7 +134,6 @@ int main(int argc, char *argv[]) {
 				}
 				sem_post(sem);
                 if(myself->status == end){
-                    printf("Pilote %d left the tournament! \n", myself->car_id);
                     char status[] = "end";
                     write(pipe, status, sizeof(status));
                     break;
@@ -142,7 +145,6 @@ int main(int argc, char *argv[]) {
 		}
 
 		//printf("Pilote %d left the tournament! \n", myself->car_id);
-		try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
 		exit(EXIT_SUCCESS);
 
 
@@ -154,7 +156,16 @@ int main(int argc, char *argv[]) {
 
         //Init scoreboard
         scoreboard* scoreboards = calloc(cars_cnt, sizeof(scoreboard));
-
+        for(int sc_index = 0; sc_index < cars_cnt; sc_index++){
+            scoreboard* sc = &scoreboards[sc_index];
+            //Init races and bestLaps
+            for(int race_index = 0; race_index < 7; race_index++){
+                sc->car_id = cars[sc_index];
+                sc->last_lap[race_index] = (lap*)(malloc(sizeof(lap)));
+                sc->races[race_index] = sc->last_lap[race_index];
+            }
+        }
+        free(cars);
 		//CRITICAL SECTION
 		sem_wait(sem);
 		/* Attach the shared memory, fill the structure and free the array of cars */
@@ -164,7 +175,7 @@ int main(int argc, char *argv[]) {
 			shm_addr[i].status = driving;
 		}
 		sem_post(sem);
-		free(cars);
+
 
 		/* Debug */
 		char buffer[256];
@@ -179,6 +190,13 @@ int main(int argc, char *argv[]) {
 
 			/* Wait one second to sync everyone*/
 			printf("[S] Sync cars...\n");
+
+            for (int car_counter = 0; car_counter < cars_cnt; car_counter++) {
+                pilote *current = &shm_addr[car_counter];
+                current->lap_cnt = 0;
+                current->sector = 0;
+            }
+
 			sleep(1);
 
 			/* Start a race */
@@ -209,12 +227,46 @@ int main(int argc, char *argv[]) {
                         if(data != 0){
                             //CRITICAL SECTION
                             sem_wait(sem);
-
-                            for (i = 0; i < cars_cnt; i++){
-                                pilote* current = &shm_addr[i];
+                            for (int car_counter = 0; car_counter < cars_cnt; car_counter++){
+                                pilote* current = &shm_addr[car_counter];
+                                scoreboard* scb = &scoreboards[car_counter];
                                 if(current->has_changed == 1){
-                                    printf("Pilote %d has updated\n", current->car_id);
                                     current->has_changed = 0;
+                                    if(current->status == end){
+                                        printf("car %d left\n", current->car_id);
+                                        continue;
+                                    }
+                                    if(current->sector == 0){
+                                        printf("Car %d has done a lap\n", current->car_id);
+                                        scb->last_lap[race]->time_s3 = current->time;
+                                        printf("%d : Lap n°%d : %f, %f, %f\n", scb->car_id, current->lap_cnt-1, scb->last_lap[race]->time_s1, scb->last_lap[race]->time_s2, scb->last_lap[race]->time_s3);
+                                        lap* temp = (lap*)malloc(sizeof(lap));
+                                        temp->nextlap = NULL;
+                                        scb->last_lap[race]->nextlap = temp;
+                                        scb->last_lap[race] = temp;
+
+
+
+                                        //TODO RECALCULATE BEST_LAP
+
+
+                                    }else{
+                                        switch (current->sector){
+                                            case 1:
+                                                scb->last_lap[race]->time_s1 = current->time;
+                                                break;
+                                            case 2:
+                                                scb->last_lap[race]->time_s2 = current->time;
+                                                break;
+                                            case 3:
+                                                scb->last_lap[race]->time_s3 = current->time;
+                                                break;
+                                            default:
+                                                printf("ERROR sector %d\n", current->sector);
+                                        }
+                                    }
+
+
                                 }
                             }
 
