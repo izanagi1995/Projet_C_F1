@@ -12,6 +12,7 @@ void doSector(pilote* p, float time, int pipe);
 extern sem_t* sem;
 void init_semaphore();
 int flush_pipe(int pipe);
+int compare_rank_item(const void* a, const void* b);
 extern volatile sig_atomic_t flag_alarm;
 extern volatile sig_atomic_t flag_race_stop;
 

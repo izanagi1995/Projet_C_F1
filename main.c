@@ -1,16 +1,3 @@
-/*
- * FUCKING NOTES
- * =============
- * TODO : Results
- *
- *
- *
- *
- *
- */
-
-
-
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
@@ -307,10 +294,20 @@ int main(int argc, char *argv[]) {
                             sem_post(sem);
                         }
 
-                    //Calculate results
-
 
 					}
+
+                    //Calculate results
+                    rank_item* unsorted_ranking = calloc(cars_cnt, sizeof(rank_item));
+                    for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
+                        scoreboard sc = scoreboards[rank_idx];
+                        unsorted_ranking[rank_idx] = (rank_item){.car_id = sc.car_id, .bestlap = sc.bestlaps[race].best_lap};
+                    }
+                    mergesort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
+                    for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
+                        rank_item ri = unsorted_ranking[rank_idx];
+                        printf("%d° : Car %d with best lap : %f\n", rank_idx+1, ri.car_id, ri.bestlap);
+                    }
 
 
 

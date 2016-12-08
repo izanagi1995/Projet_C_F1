@@ -51,3 +51,9 @@ struct pilote {
 	status status;
 	int has_changed;
 };
+
+typedef struct rank_item rank_item;
+struct rank_item{
+    int car_id;
+    float bestlap;
+};

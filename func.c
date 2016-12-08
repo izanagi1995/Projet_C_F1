@@ -59,10 +59,15 @@ int flush_pipe(int pipe){
 
 }
 
+int compare_rank_item(const void* a, const void* b){
+    rank_item* ra = (rank_item*) a;
+    rank_item* rb = (rank_item*) b;
+    return ra->bestlap - rb->bestlap;
+}
+
 volatile sig_atomic_t flag_alarm;
 volatile sig_atomic_t flag_race_stop;
 void sighandler(int sig) {
-
     switch (sig) {
         case SIG_RACE_STOP:
             flag_race_stop = 1;
@@ -74,7 +79,6 @@ void sighandler(int sig) {
 }
 
 void doSector(pilote* p, float time, int pipe){
-
 
     p->time = time;
 
