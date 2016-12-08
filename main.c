@@ -1,7 +1,7 @@
 /*
  * FUCKING NOTES
  * =============
- * TODO : bestlap
+ * TODO : Results
  *
  *
  *
@@ -18,8 +18,6 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include <time.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <semaphore.h>
 #include "defs.h"
 #include "func.h"
@@ -122,10 +120,6 @@ int main(int argc, char *argv[]) {
 			flag_race_stop = 0;
 			while (!flag_race_stop) {
 
-                if(myself->status == end){
-                    printf("PROBLEM status = end\n");
-                }
-
 				//CRITICAL SECTION
 				sem_wait(sem);
 				// Variables:
@@ -142,12 +136,12 @@ int main(int argc, char *argv[]) {
 				doSector(myself, time, pipe);
 
                 if((rand() % 100) < 5){
-					myself->status = end;
+					myself->status = out;
                     myself->has_changed = 1;
 				}
 				sem_post(sem);
-                if(myself->status == end){
-                    char status[] = "end";
+                if(myself->status == out){
+                    char status[] = "out";
                     write(pipe, status, sizeof(status));
                     break;
                 }
@@ -176,6 +170,7 @@ int main(int argc, char *argv[]) {
                 sc->car_id = cars[sc_index];
                 sc->last_lap[race_index] = (lap*)(malloc(sizeof(lap)));
                 sc->races[race_index] = sc->last_lap[race_index];
+                sc->bestlaps[race_index] = (bestlap){ .best_s1 = 999, .best_s2 = 999, .best_s3 = 999, .best_lap = 999 };
             }
         }
         free(cars);
@@ -208,6 +203,9 @@ int main(int argc, char *argv[]) {
                 pilote *current = &shm_addr[car_counter];
                 current->lap_cnt = 0;
                 current->sector = 0;
+                if(current->status == out){
+                    current->status = driving;
+                }
             }
 
 			sleep(1);
@@ -253,22 +251,37 @@ int main(int argc, char *argv[]) {
                                 scoreboard* scb = &scoreboards[car_counter];
                                 if(current->has_changed == 1){
                                     current->has_changed = 0;
-                                    if(current->status == end){
+                                    if(current->status == out ){
                                         printf("car %d left\n", current->car_id);
                                         continue;
                                     }
                                     if(current->sector == 0){
                                         printf("Car %d has done a lap\n", current->car_id);
                                         scb->last_lap[race]->time_s3 = current->time;
+
+                                        //Set best lap
+                                        if(scb->bestlaps[race].best_lap > scb->last_lap[race]->time_s1 + scb->last_lap[race]->time_s2 + scb->last_lap[race]->time_s3){
+                                            scb->bestlaps[race].best_lap = scb->last_lap[race]->time_s1 + scb->last_lap[race]->time_s2 + scb->last_lap[race]->time_s3;
+                                        }
+                                        //Set best s1
+                                        if(scb->bestlaps[race].best_s1 > scb->last_lap[race]->time_s1){
+                                            scb->bestlaps[race].best_s1 = scb->last_lap[race]->time_s1;
+                                        }
+                                        //Set best s2
+                                        if(scb->bestlaps[race].best_s2 > scb->last_lap[race]->time_s2){
+                                            scb->bestlaps[race].best_s2 = scb->last_lap[race]->time_s2;
+                                        }
+                                        //Set best s3
+                                        if(scb->bestlaps[race].best_s3 > scb->last_lap[race]->time_s3){
+                                            scb->bestlaps[race].best_s3 = scb->last_lap[race]->time_s3;
+                                        }
+
+
                                         printf("%d : Lap n°%d : %f, %f, %f\n", scb->car_id, current->lap_cnt-1, scb->last_lap[race]->time_s1, scb->last_lap[race]->time_s2, scb->last_lap[race]->time_s3);
                                         lap* temp = (lap*)malloc(sizeof(lap));
                                         temp->nextlap = NULL;
                                         scb->last_lap[race]->nextlap = temp;
                                         scb->last_lap[race] = temp;
-
-
-
-                                        //TODO RECALCULATE BEST_LAP
 
 
                                     }else{
@@ -294,10 +307,13 @@ int main(int argc, char *argv[]) {
                             sem_post(sem);
                         }
 
-
+                    //Calculate results
 
 
 					}
+
+
+
 					break;
 				case 3:
 				case 4:
