@@ -8,6 +8,8 @@
 #include <semaphore.h>
 #include "defs.h"
 #include "func.h"
+#include <ncurses.h>
+#include "curses-utils.h"
 
 int main(int argc, char *argv[]) {
 	/* Cars have to be sent through the args of the cli */
@@ -16,7 +18,10 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+
 	init_semaphore();
+
+
 
 	/* Init variable */
 	int i, loop_count, tmp, race;
@@ -30,10 +35,10 @@ int main(int argc, char *argv[]) {
 
 	/* Read the args to get the cars */
 	cars_cnt = (size_t) argc - 1;
+
 	cars = (int*) try_sys_call_ptr(calloc(cars_cnt, sizeof(int)), "Malloc failure");
 	for (i = 0; i < cars_cnt; i++) {
 		cars[i] = (int) strtol(argv[i + 1], (char **)NULL, 10);
-		printf("Got car #%d: %d\n", i, cars[i]);
 	}
 
 	/* Init the pipes */
@@ -41,7 +46,6 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < cars_cnt; i++) {
 
 	}
-	printf("pipes initialized.\n");
 
 	/*	Init the shamed memory with a random key. Fail after 30 try*/
 	loop_count = 0;
@@ -50,7 +54,6 @@ int main(int argc, char *argv[]) {
 		shm_id = shmget(shm_key, cars_cnt * sizeof(pilote), IPC_CREAT | IPC_EXCL | 0660);
 	} while (loop_count++ < 30 && errno == EEXIST);
 	try_sys_call_int(shm_id, "Shmget failure");
-	printf("Shared memory has ID: %d\n", shm_id);
 
 	/* Fork */
 	pids = (pid_t*) try_sys_call_ptr(malloc(cars_cnt * sizeof(pid_t)), "Malloc failure");
@@ -84,7 +87,6 @@ int main(int argc, char *argv[]) {
 		close(pipes[0]);
 		//free(pipes);
 
-		printf("Process ID %d is car at index %d and has access to %p.\n", getpid(), car_idx, myself);
 
 		/* Signals handled by signal syscall */
 		signal(SIG_RACE_STOP, sighandler);
@@ -103,7 +105,6 @@ int main(int argc, char *argv[]) {
 			}
 
 			/* Enter main loop, break when SIG_RACE_STOP is fired */
-			printf("Race started\n");
 			flag_race_stop = 0;
 			while (!flag_race_stop) {
 
@@ -144,7 +145,25 @@ int main(int argc, char *argv[]) {
 
 	/* Father */
 	} else {
-		printf("Server started\n");
+        initscr();
+        cbreak();
+        noecho();
+        refresh();
+        /*WINDOW* st_win = newwin(2, COLS-1, 0, 0);
+        for(int widthIt = 0; widthIt < COLS; widthIt++){
+            mvprintw(1, widthIt,"-");
+        }
+        for(int c = 0; c < cars_cnt; c++){
+            mvprintw(c+2, 0, "%d", cars[c]);
+        }
+        wrefresh(st_win);*/
+        initScreen();
+        testView();
+        writeStatus("Starting", 0, 0);
+        refresh();
+
+
+
         int pipe = pipes[0];
         close(pipes[1]);
 
@@ -173,18 +192,13 @@ int main(int argc, char *argv[]) {
 
 
 		/* Debug */
-		char buffer[256];
-		printf("Press ENTER to continue ");
-		scanf(buffer);
 		/* End debug */
 
 		signal(SIGALRM, sighandler);
 		
-		printf("[S] Enter main loop\n");
 		for (race = 0; race < 7; race++) {
 
 			/* Wait one second to sync everyone*/
-			printf("[S] Sync cars...\n");
 
             for (int car_counter = 0; car_counter < cars_cnt; car_counter++) {
                 pilote *current = &shm_addr[car_counter];
@@ -193,12 +207,14 @@ int main(int argc, char *argv[]) {
                 if(current->status == out){
                     current->status = driving;
                 }
+                updateCarStatus(car_counter, current->car_id, driving);
             }
 
 			sleep(1);
 
+            writeStatus("Running", race/3+1, race%3+1);
+
 			/* Start a race */
-			printf("[S] Start race %d:%d !\n", race / 3 + 1, race % 3 + 1);
 
             //Restore crashed car for test and qualification
             if(race / 3 == 0 || race / 3 == 1){
@@ -239,11 +255,10 @@ int main(int argc, char *argv[]) {
                                 if(current->has_changed == 1){
                                     current->has_changed = 0;
                                     if(current->status == out ){
-                                        printf("car %d left\n", current->car_id);
+                                        updateCarStatus(car_counter, current->car_id, out);
                                         continue;
                                     }
                                     if(current->sector == 0){
-                                        printf("Car %d has done a lap\n", current->car_id);
                                         scb->last_lap[race]->time_s3 = current->time;
 
                                         //Set best lap
@@ -264,7 +279,6 @@ int main(int argc, char *argv[]) {
                                         }
 
 
-                                        printf("%d : Lap n°%d : %f, %f, %f\n", scb->car_id, current->lap_cnt-1, scb->last_lap[race]->time_s1, scb->last_lap[race]->time_s2, scb->last_lap[race]->time_s3);
                                         lap* temp = (lap*)malloc(sizeof(lap));
                                         temp->nextlap = NULL;
                                         scb->last_lap[race]->nextlap = temp;
@@ -282,8 +296,6 @@ int main(int argc, char *argv[]) {
                                             case 3:
                                                 scb->last_lap[race]->time_s3 = current->time;
                                                 break;
-                                            default:
-                                                printf("ERROR sector %d\n", current->sector);
                                         }
                                     }
 
@@ -292,6 +304,9 @@ int main(int argc, char *argv[]) {
                             }
 
                             sem_post(sem);
+
+                            //UPDATE GUI
+
                         }
 
 
@@ -306,7 +321,6 @@ int main(int argc, char *argv[]) {
                     mergesort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
                     for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
                         rank_item ri = unsorted_ranking[rank_idx];
-                        printf("%d° : Car %d with best lap : %f\n", rank_idx+1, ri.car_id, ri.bestlap);
                     }
 
 
@@ -333,7 +347,6 @@ int main(int argc, char *argv[]) {
 			}
 
 			/* Stop the current race */
-			printf("End race !\n");
 			for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_STOP);
 		}
 
@@ -342,10 +355,11 @@ int main(int argc, char *argv[]) {
 
 		/* Wait for children to stop */
 		for (i = 0; i < cars_cnt; i++) {
-			printf("[S] Wait for child %d to stop.\n", pids[i]);
 			try_sys_call_int(waitpid(pids[i], &tmp, 0), "Waitpid failure");
 		}
-
+        echo();
+        nocbreak();
+        endwin();
 		exit(EXIT_SUCCESS);
 	}
 }
