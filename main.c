@@ -1,3 +1,16 @@
+/*
+ * FUCKING NOTES
+ * =============
+ * TODO : bestlap
+ *
+ *
+ *
+ *
+ *
+ */
+
+
+
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
@@ -201,6 +214,14 @@ int main(int argc, char *argv[]) {
 
 			/* Start a race */
 			printf("[S] Start race %d:%d !\n", race / 3 + 1, race % 3 + 1);
+
+            //Restore crashed car for test and qualification
+            if(race / 3 == 0 || race / 3 == 1){
+                for (int car_counter = 0; car_counter < cars_cnt; car_counter++) {
+                    pilote *current = &shm_addr[car_counter];
+                    current->status = driving;
+                }
+            }
 			for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_START);
 
 
