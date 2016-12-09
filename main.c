@@ -161,16 +161,17 @@ int main(int argc, char *argv[]) {
 
 	/* Father */
 	} else {
-        initscr();
-        cbreak();
-        noecho();
-        refresh();
-        initScreen(cars_cnt);
-        testView();
-        writeStatus("Starting", 0, 0);
-        refresh();
 
 
+        //CRITICAL SECTION
+        sem_wait(sem);
+        /* Attach the shared memory, fill the structure and free the array of cars */
+        pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
+        for (i = 0; i < cars_cnt; i++) {
+            shm_addr[i].car_id = cars[i];
+            shm_addr[i].status = driving;
+        }
+        sem_post(sem);
 
         int pipe = pipes[0];
         close(pipes[1]);
@@ -187,18 +188,23 @@ int main(int argc, char *argv[]) {
                 sc->bestlaps[race_index] = (bestlap){ .best_s1 = 999, .best_s2 = 999, .best_s3 = 999, .best_lap = 999 };
             }
         }
+
+        initscr();
+        cbreak();
+        noecho();
+        refresh();
+        initScreen(cars_cnt);
+        testView();
+        writeStatus("Starting", 0, 0);
+        refresh();
+
+
+
+
+
+
+
         free(cars);
-		//CRITICAL SECTION
-		sem_wait(sem);
-		/* Attach the shared memory, fill the structure and free the array of cars */
-		pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
-		for (i = 0; i < cars_cnt; i++) {
-			shm_addr[i].car_id = cars[i];
-			shm_addr[i].status = driving;
-		}
-		sem_post(sem);
-
-
 		/* Debug */
 		/* End debug */
 
