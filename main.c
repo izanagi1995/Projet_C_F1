@@ -522,7 +522,7 @@ int main(int argc, char *argv[]) {
                             pilote* p = getPiloteByCarId(unsorted_ranking[r].car_id, shm_addr, cars_cnt);
                             p->status = eliminated;
                             char buffer[512];
-                            sprintf(buffer, "Car n°%d has been eleminated", p->car_id);
+                            sprintf(buffer, "Car n°%d has been eliminated", p->car_id);
                             writeHistory(buffer);
                             updateCarStatus(p->car_id - 1, p->car_id, eliminated);
                         }
