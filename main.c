@@ -506,7 +506,7 @@ int main(int argc, char *argv[]) {
                     for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
                         scoreboard sc = scoreboards[rank_idx];
                         pilote* p = getPiloteByCarId(sc.car_id, shm_addr, cars_cnt);
-                        float time = p->status == eliminated ? 99999:(sc.bestlaps[race].best_lap);git
+                        float time = p->status == eliminated ? 99999:(sc.bestlaps[race].best_lap);
                         unsorted_ranking[rank_idx] = (rank_item){.car_id = sc.car_id, .bestlap = time};
                     }
                     mergesort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
