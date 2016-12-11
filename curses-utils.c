@@ -95,15 +95,14 @@ void writeStatus(char* status, int typeRace, int numRace){
 
 void updateCarStatus(int idx, int car_id, status stat){
     if(stat == driving){
-        mvwprintw(cars_win, idx+1, 1, "%d    ", car_id);
+        mvwprintw(cars_win, idx+1, 1, "%d (D)", car_id);
     }else if(stat == pitstop){
         mvwprintw(cars_win, idx+1, 1, "%d (P)", car_id);
     }else if(stat == out){
         mvwprintw(cars_win, idx+1, 1, "%d (O)", car_id);
-
         mvwchgat(cars_res, idx+1, 1, -1, A_BOLD, 14, NULL);
         wrefresh(cars_res);
-    }else if(stat == end){
+    }else if(stat == eliminated){
         mvwprintw(cars_win, idx+1, 1, "%d (E)", car_id);
     }else{
         mvwprintw(cars_win, idx+1, 1, "%d (?)", car_id);
@@ -147,11 +146,11 @@ void setBest(int idx, int bestIdx, bestlap lap){
     wrefresh(best_win_content);
 }
 
-void updateCarBest(int idx, bestlap bestLap, int bestGlobalIdx){
+void updateCarBest(int idx, int car_num, bestlap bestLap, int bestGlobalIdx){
     mvwprintw(cars_best, idx+1, 2, "%5.2f %5.2f %5.2f : ", bestLap.best_s1, bestLap.best_s2, bestLap.best_s3);
     mvwprintw(cars_best, idx+1, 22, "%5.2f ", bestLap.best_lap);
     if(bestGlobalIdx != 0){
-        setBest(idx, bestGlobalIdx, bestLap);
+        setBest(car_num, bestGlobalIdx, bestLap);
         mvprintw(LINES-1, 1, "%d : %d", idx, bestGlobalIdx);
         refresh();
     }

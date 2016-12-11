@@ -6,7 +6,7 @@ void testView();
 void writeStatus(char* status, int typeRace, int numRace);
 void updateCarStatus(int idx, int car_id, status stat);
 void updateCarLap(int idx, float lap, int lap_cnt);
-void updateCarBest(int idx, bestlap bestLap, int bestGlobal);
+void updateCarBest(int idx, int car_num, bestlap bestLap, int bestGlobal);
 void resetWins();
 void showResults(rank_item* ranks);
 void writeHistory(char* text);
