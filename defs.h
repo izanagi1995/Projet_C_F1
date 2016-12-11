@@ -49,6 +49,7 @@ struct pilote {
 	int car_id;
 	int lap_cnt;
 	int sector;
+    int position;
 	float time;
 	enum status status;
 	int has_changed;
@@ -56,6 +57,6 @@ struct pilote {
 
 typedef struct rank_item rank_item;
 struct rank_item{
-    int car_id;
+    pilote* car;
     float bestlap;
 };

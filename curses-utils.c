@@ -79,7 +79,7 @@ void showResults(rank_item* ranks){
         attron(A_BOLD);
         mvprintw(i+1, 1, "%2d : ", i);
         attroff(A_BOLD);
-        mvprintw(i+1, 7, "Car n°%2d with best lap : %5.2f", ranks[i].car_id, ranks[i].bestlap);
+        mvprintw(i+1, 7, "Car n°%2d with best lap : %5.2f", ranks[i].car->car_id, ranks[i].bestlap);
     }
     refresh();
 }
@@ -93,26 +93,27 @@ void writeStatus(char* status, int typeRace, int numRace){
     wrefresh(status_win);
 }
 
-void updateCarStatus(int idx, int car_id, status stat){
-    if(stat == driving){
-        mvwprintw(cars_win, idx+1, 1, "%d (D)", car_id);
-    }else if(stat == pitstop){
-        mvwprintw(cars_win, idx+1, 1, "%d (P)", car_id);
-    }else if(stat == out){
-        mvwprintw(cars_win, idx+1, 1, "%d (O)", car_id);
-        mvwchgat(cars_res, idx+1, 1, -1, A_BOLD, 14, NULL);
+void updateCarStatus(pilote* p){
+    if(p->status == driving){
+        mvwprintw(cars_win, p->position+1, 1, "%d (D)", p->car_id);
+    }else if(p->status == pitstop){
+        mvwprintw(cars_win, p->position+1, 1, "%d (P)", p->car_id);
+    }else if(p->status == out){
+        mvwprintw(cars_win, p->position+1, 1, "%d (O)", p->car_id);
+        mvwchgat(cars_res, p->position+1, 1, -1, A_BOLD, 14, NULL);
         wrefresh(cars_res);
-    }else if(stat == eliminated){
-        mvwprintw(cars_win, idx+1, 1, "%d (E)", car_id);
+    }else if(p->status == eliminated){
+        mvwprintw(cars_win, p->position+1, 1, "%d (E)", p->car_id);
     }else{
-        mvwprintw(cars_win, idx+1, 1, "%d (?)", car_id);
+        mvwprintw(cars_win, p->position+1, 1, "%d (?)", p->car_id);
     }
     wrefresh(cars_win);
 }
 
-void updateCarLap(int idx, float lap, int lap_cnt){
-    mvwprintw(cars_res, idx+1, (7*(lap_cnt-1))+2, "%.2f", lap);
+void updateCarLap(pilote* p, scoreboard* sc, int race){
+    mvwprintw(cars_res, p->position+1, (7*(p->lap_cnt-1))+2, "%.2f", sc->last_lap[race]->time_s1 + sc->last_lap[race]->time_s2 + sc->last_lap[race]->time_s3);
     wrefresh(cars_res);
+
 }
 
 
@@ -146,13 +147,11 @@ void setBest(int idx, int bestIdx, bestlap lap){
     wrefresh(best_win_content);
 }
 
-void updateCarBest(int idx, int car_num, bestlap bestLap, int bestGlobalIdx){
-    mvwprintw(cars_best, idx+1, 2, "%5.2f %5.2f %5.2f : ", bestLap.best_s1, bestLap.best_s2, bestLap.best_s3);
-    mvwprintw(cars_best, idx+1, 22, "%5.2f ", bestLap.best_lap);
+void updateCarBest(pilote* p, bestlap bestLap, int bestGlobalIdx){
+    mvwprintw(cars_best, p->position+1, 2, "%5.2f %5.2f %5.2f : ", bestLap.best_s1, bestLap.best_s2, bestLap.best_s3);
+    mvwprintw(cars_best, p->position+1, 22, "%5.2f ", bestLap.best_lap);
     if(bestGlobalIdx != 0){
-        setBest(car_num, bestGlobalIdx, bestLap);
-        mvprintw(LINES-1, 1, "%d : %d", idx, bestGlobalIdx);
-        refresh();
+        setBest(p->car_id, bestGlobalIdx, bestLap);
     }
     wrefresh(cars_best);
 }

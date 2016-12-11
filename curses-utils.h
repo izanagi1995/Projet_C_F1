@@ -4,9 +4,9 @@
 void initScreen(int cars);
 void testView();
 void writeStatus(char* status, int typeRace, int numRace);
-void updateCarStatus(int idx, int car_id, status stat);
-void updateCarLap(int idx, float lap, int lap_cnt);
-void updateCarBest(int idx, int car_num, bestlap bestLap, int bestGlobal);
+void updateCarStatus(pilote* p);
+void updateCarLap(pilote* p, scoreboard* sc, int race);
+void updateCarBest(pilote* p, bestlap bestLap, int bestGlobalIdx);
 void resetWins();
 void showResults(rank_item* ranks);
 void writeHistory(char* text);
