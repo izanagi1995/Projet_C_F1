@@ -13,6 +13,7 @@ extern sem_t* sem;
 void init_semaphore();
 int flush_pipe(int pipe);
 int compare_rank_item(const void* a, const void* b);
+pilote* getPiloteByCarId(int carId, pilote* piloteArr, int num_cars);
 extern volatile sig_atomic_t flag_alarm;
 extern volatile sig_atomic_t flag_race_stop;
 

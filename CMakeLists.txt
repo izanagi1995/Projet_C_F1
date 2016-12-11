@@ -7,7 +7,9 @@ set(SOURCE_FILES
     defs.h
     func.c
     func.h
+    curses-utils.c
+    curses-utils.h
     main.c)
 
 add_executable(Projet_C_F1 ${SOURCE_FILES})
-target_link_libraries(Projet_C_F1 pthread)
+target_link_libraries(Projet_C_F1 pthread ncurses)

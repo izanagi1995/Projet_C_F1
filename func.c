@@ -93,4 +93,14 @@ void doSector(pilote* p, float time, int pipe){
     p->has_changed = 1;
     char status[] = "driving";
     write(pipe, status, sizeof(status));
+
+}
+
+pilote* getPiloteByCarId(int carId, pilote* piloteArr, int num_cars){
+    for(int i = 0; i < num_cars; i++){
+        if(carId == piloteArr[i].car_id){
+            return &piloteArr[i];
+        }
+    }
+    return NULL;
 }
