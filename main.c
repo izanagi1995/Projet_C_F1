@@ -3,13 +3,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/shm.h>
+#include <sys/mman.h>
 #include <errno.h>
-#include <time.h>
-#include <semaphore.h>
+#include <sys/time.h>
+#include <ncurses.h>
 #include "defs.h"
 #include "func.h"
-#include <ncurses.h>
 #include "curses-utils.h"
+#include "server.h"
 
 int main(int argc, char *argv[]) {
 	/* Cars have to be sent through the args of the cli */
@@ -27,11 +28,13 @@ int main(int argc, char *argv[]) {
 	int i, loop_count, tmp, race, carToGet, carToGetAccumulator = 0, r;
 	size_t cars_cnt;
 	int* cars;
-    int* startFinalRace;
+    pilote** startFinalRace;
 	int pipes[2];
 	int shm_key, shm_id;
 	pid_t* pids;
     float bestLap, bestS1, bestS2, bestS3;
+    int elimination_counter = 0;
+
 
 	srand((unsigned int) time(NULL));
 
@@ -39,7 +42,7 @@ int main(int argc, char *argv[]) {
 	cars_cnt = (size_t) argc - 1;
 
 	cars = (int*) try_sys_call_ptr(calloc(cars_cnt, sizeof(int)), "Malloc failure");
-    startFinalRace = (int*) try_sys_call_ptr(calloc(cars_cnt, sizeof(int)), "Malloc failure");
+    startFinalRace = (pilote**) try_sys_call_ptr(calloc(cars_cnt, sizeof(pilote*)), "Malloc failure");
 	for (i = 0; i < cars_cnt; i++) {
 		cars[i] = (int) strtol(argv[i + 1], (char **)NULL, 10);
 	}
@@ -67,7 +70,6 @@ int main(int argc, char *argv[]) {
 
 	/* Child */
 	if (i < cars_cnt) {
-
         srand((unsigned int) (time(NULL) ^ (getpid() << 16)));
 
 		/* Init variable */
@@ -110,7 +112,6 @@ int main(int argc, char *argv[]) {
 			/* Enter main loop, break when SIG_RACE_STOP is fired */
 			flag_race_stop = 0;
 			while (!flag_race_stop && myself->status != eliminated) {
-
 				//CRITICAL SECTION
 				sem_wait(sem);
 				// Variables:
@@ -124,15 +125,17 @@ int main(int argc, char *argv[]) {
 				float time = (float)(intTime);
 
                 if(myself->sector == 2){
-                    if((rand() % 100) < 10){
+                    if((rand() % 100) < 2){
                         myself->status = pitstop;
                         myself->has_changed = 1;
                     }
                 }
 
-				doSector(myself, time, pipe);
 
-                if((rand() % 100) < 2){
+
+				float confirmed_time = doSector(myself, time, pipe);
+
+                if((rand() % 1000) < 3){
 					myself->status = out;
                     myself->has_changed = 1;
 				}
@@ -145,7 +148,7 @@ int main(int argc, char *argv[]) {
                     break;
                 }
 
-				usleep((useconds_t) (intTime * 1000000 / 60));
+				usleep((useconds_t) (confirmed_time * 1000000 / 60 * simulation_divider));
 
                 if(myself->status == pitstop) myself->status = driving;
 
@@ -159,50 +162,7 @@ int main(int argc, char *argv[]) {
 	/* Father */
 	} else {
 
-
-        //CRITICAL SECTION
-        sem_wait(sem);
-        /* Attach the shared memory, fill the structure and free the array of cars */
-        pilote* shm_addr = (pilote*) try_sys_call_ptr(shmat(shm_id, NULL, 0), "Shmat failure");
-        for (i = 0; i < cars_cnt; i++) {
-            shm_addr[i].car_id = cars[i];
-            shm_addr[i].status = driving;
-        }
-        sem_post(sem);
-
-        int pipe = pipes[0];
-        close(pipes[1]);
-        bestLap = 999;
-        bestS1 = 999;
-        bestS2 = 999;
-        bestS3 = 999;
-        //Init scoreboard
-        scoreboard* scoreboards = calloc(cars_cnt, sizeof(scoreboard));
-        for(int sc_index = 0; sc_index < cars_cnt; sc_index++){
-            scoreboard* sc = &scoreboards[sc_index];
-            //Init races and bestLaps
-            for(int race_index = 0; race_index < 7; race_index++){
-                sc->car_id = cars[sc_index];
-                sc->last_lap[race_index] = (lap*)(malloc(sizeof(lap)));
-                sc->races[race_index] = sc->last_lap[race_index];
-                sc->bestlaps[race_index] = (bestlap){ .best_s1 = 999, .best_s2 = 999, .best_s3 = 999, .best_lap = 999 };
-            }
-        }
-
-        initscr();
-        cbreak();
-        noecho();
-        refresh();
-        initScreen((int) cars_cnt);
-        testView();
-        writeStatus("Starting", 0, 0);
-        refresh();
-
-
-
-
-
-
+        initServer(shm_id, pipes, cars, cars_cnt, pids);
 
 		/* Debug */
 		/* End debug */
@@ -212,48 +172,28 @@ int main(int argc, char *argv[]) {
 		for (race = 0; race < 7; race++) {
 
             resetWins();
-            bestLap = 999;
-            bestS1 = 999;
-            bestS2 = 999;
-            bestS3 = 999;
+            resetTimers();
 
             if(race / 3 == 0 || race / 3 == 1){
-                for (int car_counter = 0; car_counter < cars_cnt; car_counter++) {
-                    pilote *current = &shm_addr[car_counter];
-                    if(current->status == out){
-                        current->status = driving;
-                    }
-                }
-            }
-            for(int sc_index = 0; sc_index < cars_cnt; sc_index++){
-                scoreboard* sc = &scoreboards[sc_index];
-                //Init races and bestLaps
-                sc->car_id = cars[sc_index];
-                sc->last_lap[race] = (lap*)(calloc(1, sizeof(lap)));
-                sc->races[race] = sc->last_lap[race];
-                sc->bestlaps[race] = (bestlap){ .best_s1 = 999, .best_s2 = 999, .best_s3 = 999, .best_lap = 999 };
+                sem_wait(sem);
+                resetPilotesByStatus(out);
+                sem_post(sem);
+            }else{
+                sem_wait(sem);
+                resetPilotesByStatus(eliminated);
+                sem_post(sem);
             }
 
 			/* Wait one second to sync everyone*/
-            sem_wait(sem);
-            for (int car_counter = 0; car_counter < cars_cnt; car_counter++) {
-                pilote *current = &shm_addr[car_counter];
-                current->lap_cnt = 0;
-                current->sector = 0;
-                current->position = car_counter;
-                updateCarStatus(current);
-            }
-            sem_post(sem);
-
+            critical(resetPilotes);
 			sleep(1);
-
             writeStatus("Running", race/3+1, race%3+1);
 
+            rewriteStatus();
+
 			/* Start a race */
+            startRace(race);
 
-            //Restore crashed car for test and qualification
-
-			for (i = 0; i < cars_cnt; i++) kill(pids[i], SIG_RACE_START);
 
 
 
@@ -263,7 +203,7 @@ int main(int argc, char *argv[]) {
 				case 1:
 				case 2:
 					/* Loop until the alarm signal is fired */
-					alarm(test_times[race]);
+					alarm(test_times[race] * simulation_divider);
 					flag_alarm = 0;
 					while (!flag_alarm) {
 						/* Main loop for test races */
@@ -275,13 +215,13 @@ int main(int argc, char *argv[]) {
 						 * int cars_cnt: number of pilotes
 						 * int race: the id of the race (0-2: test, 3-5: qualif, 6: race)
 						 * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
-                        int data = flush_pipe(pipe);
+                        int data = flush_pipe(myPipe);
                         if(data != 0){
                             //CRITICAL SECTION
                             sem_wait(sem);
                             for (int car_counter = 0; car_counter < cars_cnt; car_counter++){
                                 pilote* current = &shm_addr[car_counter];
-                                scoreboard* scb = &scoreboards[car_counter];
+                                scoreboard* scb = current->scores;
                                 if(current->has_changed == 1){
                                     current->has_changed = 0;
                                     updateCarStatus(current);
@@ -291,7 +231,7 @@ int main(int argc, char *argv[]) {
                                     if(current->status == pitstop){
                                         scb->last_lap[race]->time_pit = current->time;
                                     }
-                                    if(current->sector == 0){
+                                    if(current->sector == 0 && current->lap_cnt != 0){
                                         scb->last_lap[race]->time_s3 = current->time;
 
                                         //Set best lap
@@ -366,7 +306,7 @@ int main(int argc, char *argv[]) {
                                 }
                             }
 
-                            //REDO POSITION
+
 
                             sem_post(sem);
                         }
@@ -376,12 +316,12 @@ int main(int argc, char *argv[]) {
 
                     //Calculate results
                     rank_item* unsorted_ranking = calloc(cars_cnt, sizeof(rank_item));
+
                     for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
-                        scoreboard sc = scoreboards[rank_idx];
-                        pilote* p = getPiloteByCarId(sc.car_id, shm_addr, cars_cnt);
-                        unsorted_ranking[rank_idx] = (rank_item){.car = p, .bestlap = sc.bestlaps[race].best_lap};
+                        scoreboard* sc = (&shm_addr[rank_idx])->scores;
+                        unsorted_ranking[rank_idx] = (rank_item){.car = (&shm_addr[rank_idx]), .bestlap = sc->bestlaps[race].best_lap};
                     }
-                    mergesort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
+                    qsort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
                     showResults(unsorted_ranking);
                     getch();
 
@@ -398,7 +338,7 @@ int main(int argc, char *argv[]) {
                         carToGet = 10;
                     }
 					/* Loop until the alarm signal is fired */
-					alarm(qualif_times[race % 3]);
+					alarm(qualif_times[race % 3] * simulation_divider);
                     flag_alarm = 0;
                     while (!flag_alarm) {
                         /* Main loop for test races */
@@ -410,7 +350,7 @@ int main(int argc, char *argv[]) {
                          * int cars_cnt: number of pilotes
                          * int race: the id of the race (0-2: test, 3-5: qualif, 6: race)
                          * flag_alarm: is 1 when the countdown for the current race reach 0, otherwise 0*/
-                        int data = flush_pipe(pipe);
+                        int data = flush_pipe(myPipe);
                         if(data != 0){
                             //CRITICAL SECTION
                             sem_wait(sem);
@@ -431,7 +371,7 @@ int main(int argc, char *argv[]) {
                                     if(current->status == pitstop){
                                         scb->last_lap[race]->time_pit = current->time;
                                     }
-                                    if(current->sector == 0){
+                                    if(current->sector == 0 && current->lap_cnt != 0){
                                         scb->last_lap[race]->time_s3 = current->time;
 
                                         //Set best lap
@@ -516,12 +456,10 @@ int main(int argc, char *argv[]) {
                     //Calculate results
                     unsorted_ranking = calloc(cars_cnt, sizeof(rank_item));
                     for(int rank_idx = 0; rank_idx < cars_cnt; rank_idx++){
-                        scoreboard sc = scoreboards[rank_idx];
-                        pilote* p = getPiloteByCarId(sc.car_id, shm_addr, (int) cars_cnt);
-                        float time = p->status == eliminated ? 99999.0F:(sc.bestlaps[race].best_lap);
-                        unsorted_ranking[rank_idx] = (rank_item){.car = p, .bestlap = time};
+                        scoreboard* sc = (&shm_addr[rank_idx])->scores;
+                        unsorted_ranking[rank_idx] = (rank_item){.car = (&shm_addr[rank_idx]), .bestlap = sc->bestlaps[race].best_lap};
                     }
-                    mergesort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
+                    qsort(unsorted_ranking, cars_cnt, sizeof(rank_item), &compare_rank_item);
 
                     //Eliminate last cars
                     char debugbuffer[512];
@@ -531,12 +469,13 @@ int main(int argc, char *argv[]) {
 
                     for(r = (int) (cars_cnt - carToGetAccumulator - 1); r >= cmp; r--){
                         if(r>=0){
-                            pilote* p = unsorted_ranking->car;
+                            pilote* p = unsorted_ranking[r].car;
                             p->status = eliminated;
                             char buffer[512];
                             sprintf(buffer, "Car n°%d has been eliminated", p->car_id);
                             writeHistory(buffer);
                             updateCarStatus(p);
+                            startFinalRace[r] = p;
                         }
                     }
                     getch();
@@ -544,13 +483,140 @@ int main(int argc, char *argv[]) {
                     carToGetAccumulator += carToGet;
                     showResults(unsorted_ranking);
 
+
                     getch();
 
 
 					break;
 				case 6:
 
-					// TODO
+
+                    //Reorder by startFinalRace
+                    for(r = 0; r < cars_cnt; r++){
+                        startFinalRace[r]->position = r;
+                        updateCarStatus(startFinalRace[r]);
+                        writePosition(startFinalRace[r]);
+                    }
+                    while(finished_race_count != cars_cnt){
+
+                        int data = flush_pipe(myPipe);
+                        if(data != 0){
+
+                            //CRITICAL SECTION
+                            sem_wait(sem);
+                            for (int car_counter = 0; car_counter < cars_cnt; car_counter++){
+                                pilote* current = &shm_addr[car_counter];
+                                if(current->status == eliminated){
+                                    current->has_changed = 0;
+                                    continue;
+                                }
+                                scoreboard* scb = &scoreboards[car_counter];
+                                if(current->has_changed == 1){
+                                    current->has_changed = 0;
+                                    updateCarStatus(current);
+                                    if(current->status == out){
+                                        current->position = (int)cars_cnt - 1 - (elimination_counter++);
+                                        finished_race_count++;
+                                        continue;
+                                    }
+                                    if(current->status == pitstop){
+                                        scb->last_lap[race]->time_pit = current->time;
+                                    }
+                                    if(current->sector == 0 && current->lap_cnt != 0){
+                                        scb->last_lap[race]->time_s3 = current->time;
+
+                                        //Set best lap
+                                        if(scb->bestlaps[race].best_lap > scb->last_lap[race]->time_s1 + scb->last_lap[race]->time_s2 + scb->last_lap[race]->time_s3 + scb->last_lap[race]->time_pit){
+                                            scb->bestlaps[race].best_lap = scb->last_lap[race]->time_s1 + scb->last_lap[race]->time_s2 + scb->last_lap[race]->time_s3 + scb->last_lap[race]->time_pit;
+                                            if(bestLap > scb->bestlaps[race].best_lap){
+                                                bestLap = scb->bestlaps[race].best_lap;
+                                                updateCarBest(current, scb->bestlaps[race], 4);
+                                            }else{
+                                                updateCarBest(current, scb->bestlaps[race], 0);
+                                            }
+
+                                        }
+                                        //Set best s1
+                                        if(scb->bestlaps[race].best_s1 > scb->last_lap[race]->time_s1){
+                                            scb->bestlaps[race].best_s1 = scb->last_lap[race]->time_s1;
+                                            if(bestS1 > scb->bestlaps[race].best_s1){
+                                                bestS1 = scb->bestlaps[race].best_s1;
+                                                updateCarBest(current, scb->bestlaps[race], 1);
+                                            }else{
+                                                updateCarBest(current, scb->bestlaps[race], 0);
+                                            }
+                                        }
+                                        //Set best s2
+                                        if(scb->bestlaps[race].best_s2 > scb->last_lap[race]->time_s2){
+                                            scb->bestlaps[race].best_s2 = scb->last_lap[race]->time_s2;
+                                            if(bestS2 > scb->bestlaps[race].best_s2){
+                                                bestS2 = scb->bestlaps[race].best_s2;
+                                                updateCarBest(current, scb->bestlaps[race], 2);
+                                            }else{
+                                                updateCarBest(current, scb->bestlaps[race], 0);
+                                            }
+                                        }
+                                        //Set best s3
+                                        if(scb->bestlaps[race].best_s3 > scb->last_lap[race]->time_s3){
+                                            scb->bestlaps[race].best_s3 = scb->last_lap[race]->time_s3;
+                                            if(bestS3 > scb->bestlaps[race].best_s3){
+                                                bestS3 = scb->bestlaps[race].best_s3;
+                                                updateCarBest(current, scb->bestlaps[race], 3);
+                                            }else{
+                                                updateCarBest(current, scb->bestlaps[race], 0);
+                                            }
+                                        }
+
+                                        updateCarLap(current, scb, race);
+
+                                        lap* temp = (lap*)calloc(1, sizeof(lap)); //Trick to set all times to 0
+                                        temp->nextlap = NULL;
+                                        scb->last_lap[race]->nextlap = temp;
+                                        scb->last_lap[race] = temp;
+
+                                        if(race_laps == current->lap_cnt) {
+                                            kill(pids[car_counter], SIG_RACE_STOP);
+                                            finished_race_count++;
+                                        }
+
+
+                                    }else{
+                                        switch (current->sector){
+                                            case 1:
+                                                scb->last_lap[race]->time_s1 = current->time;
+                                                break;
+                                            case 2:
+                                                scb->last_lap[race]->time_s2 = current->time;
+                                                break;
+                                            case 3:
+                                                scb->last_lap[race]->time_s3 = current->time;
+                                                break;
+                                            default:
+                                                //NEVER HAPPEN
+                                                break;
+                                        }
+                                    }
+
+
+                                }
+                            }
+                            sem_post(sem);
+                        }
+
+                        final_race_do_sort();
+                        final_race_do_update_pos();
+                    }
+
+                    for (i = 0; i < cars_cnt; i++) (&shm_addr[i])->status = end;
+                    //Calculate results
+
+                    mergesort(shm_addr, cars_cnt, sizeof(pilote), &compare_pilote_position);
+
+                    getch();
+
+                    showFinalResults(shm_addr);
+
+                    getch();
 
 					break;
                 default:
@@ -565,13 +631,15 @@ int main(int argc, char *argv[]) {
 		/* Detach the shared memory */
 		try_sys_call_int(shmdt(shm_addr), "Shmdet failure");
 
-		/* Wait for children to stop */
-		for (i = 0; i < cars_cnt; i++) {
-			try_sys_call_int(waitpid(pids[i], &tmp, 0), "Waitpid failure");
-		}
+        for (i = 0; i < cars_cnt; i++) kill(pids[i], SIGKILL);
+        for (i = 0; i < cars_cnt; i++) wait(NULL);
+
         echo();
         nocbreak();
         endwin();
+
+
 		exit(EXIT_SUCCESS);
 	}
+
 }

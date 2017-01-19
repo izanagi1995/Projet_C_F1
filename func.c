@@ -12,12 +12,21 @@
 #include <poll.h>
 
 #include "defs.h"
+#include "server.h"
+
+
+#include "curses-utils.h"
+
+
+volatile sig_atomic_t flag_alarm;
+volatile sig_atomic_t flag_race_stop;
 
 int try_sys_call_int(int syscall_ret, char* msg_on_fail) {
 	if (syscall_ret != -1) return syscall_ret;
 	perror(msg_on_fail);
 	exit(EXIT_FAILURE);
 }
+
 
 void* try_sys_call_ptr(void* syscall_ret, char* msg_on_fail) {
 	if (syscall_ret != NULL) return syscall_ret;
@@ -65,8 +74,27 @@ int compare_rank_item(const void* a, const void* b){
     return ra->bestlap - rb->bestlap;
 }
 
-volatile sig_atomic_t flag_alarm;
-volatile sig_atomic_t flag_race_stop;
+int compare_pilotes(const void* a, const void* b){
+    pilote* ra = (pilote*) a;
+    pilote* rb = (pilote*) b;
+    if(ra->lap_cnt == rb->lap_cnt){
+        if(ra->sector == rb->sector){
+            return rb->time - ra->time;
+        }else{
+            return rb->sector - ra->sector;
+        }
+    }else{
+        return rb->lap_cnt - ra->lap_cnt;
+    }
+}
+
+int compare_pilote_position(const void* a, const void* b){
+    pilote* ra = (pilote*) a;
+    pilote* rb = (pilote*) b;
+    return ra->position - rb->position;
+}
+
+
 void sighandler(int sig) {
     switch (sig) {
         case SIG_RACE_STOP:
@@ -78,7 +106,7 @@ void sighandler(int sig) {
     }
 }
 
-void doSector(pilote* p, float time, int pipe){
+float doSector(pilote* p, float time, int pipe){
 
     p->time = time;
 
@@ -89,18 +117,11 @@ void doSector(pilote* p, float time, int pipe){
         }
     }
 
-
     p->has_changed = 1;
     char status[] = "driving";
     write(pipe, status, sizeof(status));
 
+    return p->time;
+
 }
 
-pilote* getPiloteByCarId(int carId, pilote* piloteArr, int num_cars){
-    for(int i = 0; i < num_cars; i++){
-        if(carId == piloteArr[i].car_id){
-            return &piloteArr[i];
-        }
-    }
-    return NULL;
-}

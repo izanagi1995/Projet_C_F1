@@ -1,9 +1,13 @@
+#ifndef PROJET_F1_C_DEFS_H
+#define PROJET_F1_C_DEFS_H
+
 #define SIG_RACE_START (SIGUSR1)
 #define SIG_RACE_STOP (SIGUSR2)
 
-static const unsigned int test_times[] = {90, 90, 60};
-static const unsigned int qualif_times[] = {18, 15, 12};
+static const unsigned int test_times[] = {2, 2, 2};
+static const unsigned int qualif_times[] = {5, 4, 3};
 static const int race_laps = 50;
+static const int simulation_divider = 1;
 
 /* Valid status for pilote.status */
 typedef enum status status;
@@ -47,16 +51,19 @@ struct scoreboard {
 typedef struct pilote pilote;
 struct pilote {
 	int car_id;
+	int cli_idx;
 	int lap_cnt;
 	int sector;
     int position;
 	float time;
 	enum status status;
 	int has_changed;
+	scoreboard* scores;
 };
-
 typedef struct rank_item rank_item;
 struct rank_item{
     pilote* car;
     float bestlap;
 };
+
+#endif

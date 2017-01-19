@@ -9,6 +9,8 @@ set(SOURCE_FILES
     func.h
     curses-utils.c
     curses-utils.h
+    server.c
+    server.h
     main.c)
 
 add_executable(Projet_C_F1 ${SOURCE_FILES})
