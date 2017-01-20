@@ -37,8 +37,8 @@ void* try_sys_call_ptr(void* syscall_ret, char* msg_on_fail) {
 sem_t* sem;
 
 void init_semaphore(){
-    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, 1);
     sem_unlink ("pSem");
+    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, 1);
     // 1 = Only 1 process at a time doing action on shm
 }
 
