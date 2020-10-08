@@ -12,11 +12,11 @@ static const int simulation_divider = 1;
 /* Valid status for pilote.status */
 typedef enum status status;
 enum status {
-    driving,
-    pitstop,
-    out,
+	driving,
+	pitstop,
+	out,
 	eliminated,
-    end
+	end
 };
 
 /* A queue of laps, each the time by sector and a pointer to the next lap */
@@ -26,7 +26,7 @@ struct lap {
 	float time_s1;
 	float time_s2;
 	float time_s3;
-    float time_pit;
+	float time_pit;
 };
 
 /* Best time by sector and best lap time */
@@ -54,7 +54,7 @@ struct pilote {
 	int cli_idx;
 	int lap_cnt;
 	int sector;
-    int position;
+	int position;
 	float time;
 	enum status status;
 	int has_changed;
@@ -62,8 +62,8 @@ struct pilote {
 };
 typedef struct rank_item rank_item;
 struct rank_item{
-    pilote* car;
-    float bestlap;
+	pilote* car;
+	float bestlap;
 };
 
 #endif
